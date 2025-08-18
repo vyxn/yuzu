@@ -8,6 +8,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal/kitsu"
+	"github.com/vyxn/yuzu/internal/lib"
 	"github.com/vyxn/yuzu/internal/pkg/log"
 )
 
@@ -28,6 +29,7 @@ func main() {
 	e.GET("/mangaInfo", hMangaInfo)
 	e.GET("/mangaChapters", hMangaChapters)
 	e.GET("/comicinfo", hComicInfo)
+	e.GET("/lib", hLib)
 
 	// Start server
 	port := ":8080"
@@ -104,4 +106,12 @@ func hComicInfo(c echo.Context) error {
 	ci := kitsu.ParseToComicInfoChapter(mangaInfo, chapterInfo)
 
 	return c.XML(http.StatusOK, ci)
+}
+
+func hLib(c echo.Context) error {
+	err := lib.Process("testlib")
+	if err != nil {
+		panic(err)
+	}
+	return c.String(http.StatusOK, "all good")
 }
