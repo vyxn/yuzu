@@ -8,11 +8,20 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal/kitsu"
+	"github.com/vyxn/yuzu/internal/pkg/log"
 )
+
+var logger *slog.Logger
+
+func init() {
+	logger = log.NewLogger()
+}
 
 func main() {
 	e := echo.New()
-	e.Use(logger)
+	e.HideBanner = true
+	e.HidePort = true
+	e.Use(mLogger)
 
 	// Routes
 	e.GET("/", hello)
@@ -21,17 +30,23 @@ func main() {
 	e.GET("/comicinfo", hComicInfo)
 
 	// Start server
-	if err := e.Start(":8080"); err != nil &&
+	port := ":8080"
+	logger.Info("http server started", slog.String("port", port))
+	if err := e.Start(port); err != nil &&
 		!errors.Is(err, http.ErrServerClosed) {
-		slog.Error("failed to start server", "error", err)
+		logger.Error("failed to start server", "error", err)
 	}
 }
 
 // Middleware
-func logger(next echo.HandlerFunc) echo.HandlerFunc {
+func mLogger(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		req := c.Request()
-		fmt.Printf("Called: %s, With: [%s]\n", req.URL.Path, req.URL.RawQuery)
+		logger.Info("← h",
+			slog.String("method", req.Method),
+			slog.String("path", req.URL.Path),
+			slog.String("query", req.URL.RawQuery),
+		)
 		return next(c)
 	}
 }

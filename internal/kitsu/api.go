@@ -3,13 +3,27 @@ package kitsu
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
 	"time"
+
+	"github.com/vyxn/yuzu/internal/pkg/log"
 )
 
+var logger *slog.Logger
+
+func init() {
+	logger = log.NewLogger()
+}
+
 func GetUrl(url string) []byte {
+	logger.Info("→ r",
+		slog.String("url", url),
+		slog.String("method", http.MethodGet),
+	)
+
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	resp, err := client.Get(url)
