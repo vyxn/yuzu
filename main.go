@@ -18,6 +18,7 @@ func main() {
 	e.GET("/", hello)
 	e.GET("/mangaInfo", hMangaInfo)
 	e.GET("/mangaChapters", hMangaChapters)
+	e.GET("/comicinfo", hComicInfo)
 
 	// Start server
 	if err := e.Start(":8080"); err != nil &&
@@ -70,4 +71,22 @@ func hMangaChapters(c echo.Context) error {
 	}
 
 	return c.String(http.StatusOK, fmt.Sprintf("%+v", string(info)))
+}
+
+func hComicInfo(c echo.Context) error {
+	name := c.QueryParam("name")
+	chapter := c.QueryParam("chapter")
+
+	mangaSearchRes := kitsu.GetSearchByName(name)
+	mangaUrl := kitsu.ParseMangaListSelfLink(mangaSearchRes)
+
+	mangaInfoRes := kitsu.GetUrl(mangaUrl)
+	mangaInfo := kitsu.ParseMangaInfo(mangaInfoRes)
+
+	info := kitsu.GetMangaChapterInfo(mangaInfo.Data.ID, chapter)
+	chapterInfo := kitsu.ParseMangaChapter(info)
+
+	ci := kitsu.ParseToComicInfoChapter(mangaInfo, chapterInfo)
+
+	return c.XML(http.StatusOK, ci)
 }
