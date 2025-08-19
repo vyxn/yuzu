@@ -61,9 +61,9 @@ func hello(c echo.Context) error {
 func hMangaInfo(c echo.Context) error {
 	name := c.QueryParam("name")
 	mangaSearchRes := kitsu.GetSearchByName(name)
-	mangaUrl := kitsu.ParseMangaListSelfLink(mangaSearchRes)
+	mangaURL := kitsu.ParseMangaListSelfLink(mangaSearchRes)
 
-	mangaInfoRes := kitsu.GetUrl(mangaUrl)
+	mangaInfoRes := kitsu.GetURL(mangaURL)
 	mangaInfo := kitsu.ParseMangaInfo(mangaInfoRes)
 
 	return c.String(http.StatusOK, fmt.Sprintf("%+v", mangaInfo))
@@ -75,16 +75,16 @@ func hMangaChapters(c echo.Context) error {
 	//volume := c.QueryParam("volume")
 
 	mangaSearchRes := kitsu.GetSearchByName(name)
-	mangaUrl := kitsu.ParseMangaListSelfLink(mangaSearchRes)
+	mangaURL := kitsu.ParseMangaListSelfLink(mangaSearchRes)
 
-	mangaInfoRes := kitsu.GetUrl(mangaUrl)
+	mangaInfoRes := kitsu.GetURL(mangaURL)
 	mangaInfo := kitsu.ParseMangaInfo(mangaInfoRes)
 
 	var info []byte
 	if chapter != "" {
 		info = kitsu.GetMangaChapterInfo(mangaInfo.Data.ID, chapter)
 	} else {
-		info = kitsu.GetUrl(mangaInfo.Data.Relationships.Chapters.Links.Self)
+		info = kitsu.GetURL(mangaInfo.Data.Relationships.Chapters.Links.Self)
 	}
 
 	return c.String(http.StatusOK, fmt.Sprintf("%+v", string(info)))
@@ -95,9 +95,9 @@ func hComicInfo(c echo.Context) error {
 	chapter := c.QueryParam("chapter")
 
 	mangaSearchRes := kitsu.GetSearchByName(name)
-	mangaUrl := kitsu.ParseMangaListSelfLink(mangaSearchRes)
+	mangaURL := kitsu.ParseMangaListSelfLink(mangaSearchRes)
 
-	mangaInfoRes := kitsu.GetUrl(mangaUrl)
+	mangaInfoRes := kitsu.GetURL(mangaURL)
 	mangaInfo := kitsu.ParseMangaInfo(mangaInfoRes)
 
 	info := kitsu.GetMangaChapterInfo(mangaInfo.Data.ID, chapter)

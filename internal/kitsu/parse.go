@@ -3,6 +3,7 @@ package kitsu
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/vyxn/yuzu/internal/standard"
@@ -124,6 +125,10 @@ func ParseMangaListSelfLink(data []byte) string {
 
 	var res Response
 	if err := json.Unmarshal(data, &res); err != nil {
+		logger.Error(
+			"error Unmarshalling response",
+			slog.String("data", string(data)),
+		)
 		panic(err)
 	}
 

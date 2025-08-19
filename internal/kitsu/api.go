@@ -1,6 +1,7 @@
 package kitsu
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log/slog"
@@ -18,13 +19,16 @@ func init() {
 	logger = log.NewLogger()
 }
 
-func GetUrl(url string) []byte {
+func GetURL(url string) []byte {
 	logger.Info("→ r",
 		slog.String("url", url),
 		slog.String("method", http.MethodGet),
 	)
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // ⚠️ unsafe
+	}
+	client := &http.Client{Timeout: 10 * time.Second, Transport: tr}
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -46,38 +50,38 @@ func GetUrl(url string) []byte {
 }
 
 func GetSearchByName(name string) []byte {
-	baseUrl, err := url.Parse("https://kitsu.io/api/edge/manga")
+	baseURL, err := url.Parse("https://kitsu.io/api/edge/manga")
 	if err != nil {
 		panic(err)
 	}
 
 	params := url.Values{}
 	params.Add("filter[text]", name)
-	baseUrl.RawQuery = params.Encode()
+	baseURL.RawQuery = params.Encode()
 
-	return GetUrl(baseUrl.String())
+	return GetURL(baseURL.String())
 }
 
-func GetMangaAllChaptersInfo(mangaId string) []byte {
-	baseUrl, err := url.Parse("https://kitsu.io/api/edge/chapters")
+func GetMangaAllChaptersInfo(mangaID string) []byte {
+	baseURL, err := url.Parse("https://kitsu.io/api/edge/chapters")
 	if err != nil {
 		panic(err)
 	}
 
-	baseUrl.Path = path.Join(baseUrl.Path, mangaId)
-	return GetUrl(baseUrl.String())
+	baseURL.Path = path.Join(baseURL.Path, mangaID)
+	return GetURL(baseURL.String())
 }
 
-func GetMangaChapterInfo(mangaId string, chapter string) []byte {
-	baseUrl, err := url.Parse("https://kitsu.io/api/edge/manga")
+func GetMangaChapterInfo(mangaID string, chapter string) []byte {
+	baseURL, err := url.Parse("https://kitsu.io/api/edge/manga")
 	if err != nil {
 		panic(err)
 	}
 
-	baseUrl.Path = path.Join(baseUrl.Path, mangaId, "chapters")
+	baseURL.Path = path.Join(baseURL.Path, mangaID, "chapters")
 	params := url.Values{}
 	params.Add("filter[number]", chapter)
-	baseUrl.RawQuery = params.Encode()
+	baseURL.RawQuery = params.Encode()
 
-	return GetUrl(baseUrl.String())
+	return GetURL(baseURL.String())
 }
