@@ -1,19 +1,11 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/vyxn/yuzu/internal/kitsu"
-	"github.com/vyxn/yuzu/internal/lib"
-	"github.com/vyxn/yuzu/internal/pkg/assert"
+	"github.com/vyxn/yuzu/internal"
 	"github.com/vyxn/yuzu/internal/pkg/log"
-	"github.com/vyxn/yuzu/internal/provider"
-	"github.com/vyxn/yuzu/internal/provider/comicvine"
-	"github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
 
 var logger *slog.Logger
@@ -26,103 +18,11 @@ func main() {
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
-	e.Use(mLogger)
 
-	// Routes
-	e.GET("/", hello)
-	e.GET("/mangaInfo", hMangaInfo)
-	e.GET("/mangaChapters", hMangaChapters)
-	e.GET("/comicinfo", hComicInfo)
-	e.GET("/lib", hLib)
+	internal.SetupMiddleware(e)
+	internal.SetupRoutes(e)
 
-	// Start server
 	port := ":8080"
 	logger.Info("http server started", slog.String("port", port))
-	if err := e.Start(port); err != nil &&
-		!errors.Is(err, http.ErrServerClosed) {
-		logger.Error("failed to start server", "error", err)
-	}
-}
-
-// Middleware
-func mLogger(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		req := c.Request()
-		logger.Info("← h",
-			slog.String("method", req.Method),
-			slog.String("path", req.URL.Path),
-			slog.String("query", req.URL.RawQuery),
-		)
-		return next(c)
-	}
-}
-
-// Handler
-func hello(c echo.Context) error {
-	return c.String(http.StatusOK, "Hello, World!")
-}
-
-func hMangaInfo(c echo.Context) error {
-	name := c.QueryParam("name")
-	mangaSearchRes := kitsu.GetSearchByName(name)
-	mangaURL := kitsu.ParseMangaListSelfLink(mangaSearchRes)
-
-	mangaInfoRes := kitsu.GetURL(mangaURL)
-	mangaInfo := kitsu.ParseMangaInfo(mangaInfoRes)
-
-	return c.String(http.StatusOK, fmt.Sprintf("%+v", mangaInfo))
-}
-
-func hMangaChapters(c echo.Context) error {
-	name := c.QueryParam("name")
-	chapter := c.QueryParam("chapter")
-	//volume := c.QueryParam("volume")
-
-	mangaSearchRes := kitsu.GetSearchByName(name)
-	mangaURL := kitsu.ParseMangaListSelfLink(mangaSearchRes)
-
-	mangaInfoRes := kitsu.GetURL(mangaURL)
-	mangaInfo := kitsu.ParseMangaInfo(mangaInfoRes)
-
-	var info []byte
-	if chapter != "" {
-		info = kitsu.GetMangaChapterInfo(mangaInfo.Data.ID, chapter)
-	} else {
-		info = kitsu.GetURL(mangaInfo.Data.Relationships.Chapters.Links.Self)
-	}
-
-	return c.String(http.StatusOK, fmt.Sprintf("%+v", string(info)))
-}
-
-func hComicInfo(c echo.Context) error {
-	series := c.QueryParam("s")
-	chapter := c.QueryParam("c")
-	prov := c.QueryParam("p")
-
-	ps := []provider.ComicInfoProvider{}
-	switch prov {
-	case "comicvine":
-		ps = append(ps, comicvine.NewComicVineProvider())
-	case "kitsu":
-		ps = append(ps, kitsu.NewKitsuProvider())
-	case "myanimelist":
-		ps = append(ps, myanimelist.NewMyAnimeListProvider())
-	default:
-		ps = append(ps, myanimelist.NewMyAnimeListProvider())
-		ps = append(ps, kitsu.NewKitsuProvider())
-
-	}
-	ci := provider.MergedComicInfoChapter(series, chapter, ps...)
-
-	assert.Assert(ci != nil, "we should have a comicinfochapter here")
-
-	return c.XML(http.StatusOK, ci)
-}
-
-func hLib(c echo.Context) error {
-	err := lib.Process("testlib")
-	if err != nil {
-		panic(err)
-	}
-	return c.String(http.StatusOK, "all good")
+	e.Logger.Fatal(e.Start(port))
 }
