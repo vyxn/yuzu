@@ -12,6 +12,7 @@ import (
 	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/log"
 	"github.com/vyxn/yuzu/internal/provider"
+	"github.com/vyxn/yuzu/internal/provider/comicvine"
 	"github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
 
@@ -100,6 +101,8 @@ func hComicInfo(c echo.Context) error {
 
 	ps := []provider.ComicInfoProvider{}
 	switch prov {
+	case "comicvine":
+		ps = append(ps, comicvine.NewComicVineProvider())
 	case "kitsu":
 		ps = append(ps, kitsu.NewKitsuProvider())
 	case "myanimelist":
