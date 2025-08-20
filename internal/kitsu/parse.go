@@ -142,10 +142,10 @@ func ParseMangaListSelfLink(data []byte) string {
 func ParseToComicInfoChapter(
 	seriesData MangaInfo,
 	chapterData MangaChapter,
-) standard.ComicInfoChapter {
+) *standard.ComicInfoChapter {
 	manga := seriesData.Data.Attributes
 	chapter := chapterData.Data[0]
-	return standard.ComicInfoChapter{
+	return &standard.ComicInfoChapter{
 		Title: fmt.Sprintf(
 			"Chapter %d - %s",
 			chapter.Attributes.Number,

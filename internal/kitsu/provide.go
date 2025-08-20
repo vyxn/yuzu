@@ -13,7 +13,7 @@ func NewKitsuProvider() *KitsuComicInfoProvider {
 
 func (p *KitsuComicInfoProvider) ProvideChapter(
 	series, chapter string,
-) standard.ComicInfoChapter {
+) *standard.ComicInfoChapter {
 	mangaInfo, ok := p.cache[series]
 	if !ok {
 		seriesRes := GetSearchByName(series)

@@ -13,7 +13,7 @@ type ComicInfoChapter struct {
 	Series  string   `xml:"Series"`
 	Number  int      `xml:"Number"`
 	// Volume  int      `xml:"Volume"`
-	PageCount int    `xml:"PageCount"`
+	PageCount int    `xml:"PageCount,omitempty"`
 	Summary   string `xml:"Summary"`
 	Notes     string `xml:"Notes"`
 	Manga     string `xml:"Manga"`

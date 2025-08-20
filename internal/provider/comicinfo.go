@@ -4,5 +4,5 @@ package provider
 import "github.com/vyxn/yuzu/internal/standard"
 
 type ComicInfoProvider interface {
-	ProvideChapter(series, chapter string) standard.ComicInfoChapter
+	ProvideChapter(series, chapter string) *standard.ComicInfoChapter
 }

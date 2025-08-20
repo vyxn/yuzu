@@ -10,6 +10,7 @@ import (
 	"github.com/vyxn/yuzu/internal/kitsu"
 	"github.com/vyxn/yuzu/internal/lib"
 	"github.com/vyxn/yuzu/internal/pkg/log"
+	"github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
 
 var logger *slog.Logger
@@ -91,19 +92,13 @@ func hMangaChapters(c echo.Context) error {
 }
 
 func hComicInfo(c echo.Context) error {
-	name := c.QueryParam("name")
-	chapter := c.QueryParam("chapter")
+	series := c.QueryParam("s")
+	chapter := c.QueryParam("c")
 
-	mangaSearchRes := kitsu.GetSearchByName(name)
-	mangaURL := kitsu.ParseMangaListSelfLink(mangaSearchRes)
+	// p := kitsu.NewKitsuProvider()
+	p := myanimelist.NewMyAnimeListProvider()
+	ci := p.ProvideChapter(series, chapter)
 
-	mangaInfoRes := kitsu.GetURL(mangaURL)
-	mangaInfo := kitsu.ParseMangaInfo(mangaInfoRes)
-
-	info := kitsu.GetMangaChapterInfo(mangaInfo.Data.ID, chapter)
-	chapterInfo := kitsu.ParseMangaChapter(info)
-
-	ci := kitsu.ParseToComicInfoChapter(mangaInfo, chapterInfo)
 
 	return c.XML(http.StatusOK, ci)
 }

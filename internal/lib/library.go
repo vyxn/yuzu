@@ -6,14 +6,16 @@ import (
 	"path"
 	"regexp"
 
-	"github.com/vyxn/yuzu/internal/kitsu"
+	// "github.com/vyxn/yuzu/internal/kitsu"
 	"github.com/vyxn/yuzu/internal/provider"
+	"github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
 
 var re = regexp.MustCompile(`(?i)^.*?(?:chapter|ch|c)?\s?(\d+).*\.cbz$`)
 
 func Process(dir string) error {
-	p := kitsu.NewKitsuProvider()
+	// p := kitsu.NewKitsuProvider()
+	p := myanimelist.NewMyAnimeListProvider()
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
