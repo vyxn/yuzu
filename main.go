@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal/kitsu"
 	"github.com/vyxn/yuzu/internal/lib"
+	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/log"
 	"github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
@@ -99,6 +100,7 @@ func hComicInfo(c echo.Context) error {
 	p := myanimelist.NewMyAnimeListProvider()
 	ci := p.ProvideChapter(series, chapter)
 
+	assert.Assert(ci != nil, "we should have a comicinfochapter here")
 
 	return c.XML(http.StatusOK, ci)
 }

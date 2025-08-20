@@ -9,6 +9,7 @@ tmp_dir = "tmp"
   include_dir = ["internal"]
   exclude_dir = ["src", "tmp", "vendor", "node_modules"]
   poll = true
+  rerun = true
 
 [log]
   time = true
