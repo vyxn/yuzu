@@ -43,14 +43,13 @@ func (p *MyAnimeListComicInfoProvider) ProvideChapter(
 	// 	mangaInfo = ParseMangaInfo(mangaInfoRes)
 	// 	p.cache[series] = mangaInfo
 	// }
-	_, err := getComicInfo(series)
+	res, err := getComicInfo(series)
 	if err != nil {
 		logger.Error("error", slog.String("error", err.Error()))
 		return nil
 	}
 
-	return nil
-	// return res
+	return res
 }
 
 func getURL(url string) ([]byte, error) {

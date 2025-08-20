@@ -11,6 +11,7 @@ import (
 	"github.com/vyxn/yuzu/internal/lib"
 	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/log"
+	"github.com/vyxn/yuzu/internal/provider"
 	"github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
 
@@ -95,10 +96,20 @@ func hMangaChapters(c echo.Context) error {
 func hComicInfo(c echo.Context) error {
 	series := c.QueryParam("s")
 	chapter := c.QueryParam("c")
+	prov := c.QueryParam("p")
 
-	// p := kitsu.NewKitsuProvider()
-	p := myanimelist.NewMyAnimeListProvider()
-	ci := p.ProvideChapter(series, chapter)
+	ps := []provider.ComicInfoProvider{}
+	switch prov {
+	case "kitsu":
+		ps = append(ps, kitsu.NewKitsuProvider())
+	case "myanimelist":
+		ps = append(ps, myanimelist.NewMyAnimeListProvider())
+	default:
+		ps = append(ps, myanimelist.NewMyAnimeListProvider())
+		ps = append(ps, kitsu.NewKitsuProvider())
+
+	}
+	ci := provider.MergedComicInfoChapter(series, chapter, ps...)
 
 	assert.Assert(ci != nil, "we should have a comicinfochapter here")
 
