@@ -7,6 +7,7 @@ tmp_dir = "tmp"
   full_bin = "./tmp/main"
   include_ext = ["go", "tpl", "tmpl", "html"]
   include_dir = ["internal"]
+  include_file = ["main.go"]
   exclude_dir = ["src", "tmp", "vendor", "node_modules"]
   poll = true
   rerun = true
