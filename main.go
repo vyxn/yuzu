@@ -15,6 +15,12 @@ func init() {
 }
 
 func main() {
+	db := internal.GetDB()
+	err := db.Ping()
+	if err != nil {
+		panic(err)
+	}
+
 	e := echo.New()
 	e.HideBanner = true
 	e.HidePort = true
