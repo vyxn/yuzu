@@ -9,9 +9,9 @@ import (
 // ComicInfoChapter https://anansi-project.github.io
 type ComicInfoChapter struct {
 	XMLName         xml.Name `xml:"ComicInfo"`
-	Title           string   `xml:"Title"`
-	Series          string   `xml:"Series"`
-	Number          string   `xml:"Number"`
+	Title           string   `xml:"Title,omitempty"`
+	Series          string   `xml:"Series,omitempty"`
+	Number          string   `xml:"Number,omitempty"`
 	Count           int      `xml:"Count,omitempty"`
 	Volume          int      `xml:"Volume,omitempty"`
 	AlternateSeries string   `xml:"AlternateSeries,omitempty"`

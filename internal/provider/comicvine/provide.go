@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"strconv"
 
 	"github.com/vyxn/yuzu/internal/pkg/req"
 	"github.com/vyxn/yuzu/internal/standard"
@@ -356,9 +355,7 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 			}
 
 			ci.Title = issue.Results.Name
-			if i, err := strconv.Atoi(issue.Results.IssueNumber); err != nil {
-				ci.Number = i
-			}
+			ci.Number = issue.Results.IssueNumber
 			ci.Summary = issue.Results.Description
 
 			break
