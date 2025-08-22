@@ -2,12 +2,16 @@ package main
 
 import (
 	"log/slog"
+	"os"
+	"slices"
 
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal"
 	"github.com/vyxn/yuzu/internal/pkg/log"
 )
 
+var env = os.Getenv("YUZU_ENV")
 var logger *slog.Logger
 
 func init() {
@@ -15,6 +19,19 @@ func init() {
 }
 
 func main() {
+	envs := []string{".env"}
+	if env != "test" {
+		envs = append(envs, ".env.local")
+	}
+	if env != "" && env != "development" {
+		envs = append(envs, ".env."+env)
+	}
+	slices.Reverse(envs)
+	if err := godotenv.Load(envs...); err != nil {
+		slog.Error("error loading env", slog.Any("error", err))
+		os.Exit(1)
+	}
+
 	db := internal.GetDB()
 	err := db.Ping()
 	if err != nil {

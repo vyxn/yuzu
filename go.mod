@@ -6,6 +6,7 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/jmoiron/sqlx v1.4.0
+	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo/v4 v4.13.4
 	golang.org/x/oauth2 v0.26.0
 )
