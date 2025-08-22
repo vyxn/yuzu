@@ -8,7 +8,15 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/vyxn/yuzu/internal/pkg/log"
 )
+
+var logger *slog.Logger
+
+func init() {
+	logger = log.NewLogger()
+}
 
 const timeout = 10 * time.Second
 
@@ -19,7 +27,7 @@ func Get(
 	url string,
 	headers map[string]string,
 ) ([]byte, error) {
-	slog.Info(
+	logger.Info(
 		"→ r",
 		slog.String("method", http.MethodGet),
 		slog.String("url", url),

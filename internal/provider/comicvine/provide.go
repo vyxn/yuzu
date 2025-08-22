@@ -8,9 +8,16 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/vyxn/yuzu/internal/pkg/log"
 	"github.com/vyxn/yuzu/internal/pkg/req"
 	"github.com/vyxn/yuzu/internal/standard"
 )
+
+var logger *slog.Logger
+
+func init() {
+	logger = log.NewLogger()
+}
 
 const baseURL = "http://comicvine.gamespot.com/api/volumes"
 
@@ -39,7 +46,7 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 	u.RawQuery = q.Encode()
 
 	data, _ := req.Get(context.Background(), u.String(), nil)
-	// slog.Info("resp", slog.String("data", string(data)))
+	// logger.Info("resp", slog.String("data", string(data)))
 
 	type List struct {
 		Error                string `json:"error"`
@@ -95,7 +102,7 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 	var list List
 	if err := json.Unmarshal(data, &list); err != nil {
 		err = fmt.Errorf("error Unmarshaling json response: %w", err)
-		slog.Error(
+		logger.Error(
 			"error",
 			slog.Any("error", err),
 			slog.String("data", string(data)),
@@ -105,7 +112,7 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 
 	if list.StatusCode != 1 {
 		err = fmt.Errorf("error on comicvine response: %s", list.Error)
-		slog.Error("error", slog.Any("error", err))
+		logger.Error("error", slog.Any("error", err))
 		return nil
 	}
 
@@ -116,7 +123,7 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 		u, err := url.Parse(e.APIDetailURL)
 		if err != nil {
 			err = fmt.Errorf("error building url <%s>: %w", e.APIDetailURL, err)
-			slog.Error("error", slog.Any("error", err))
+			logger.Error("error", slog.Any("error", err))
 			return nil
 		}
 
@@ -223,7 +230,7 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 		var manga MangaInfo
 		if err := json.Unmarshal(data, &manga); err != nil {
 			err = fmt.Errorf("error Unmarshaling json response: %w", err)
-			slog.Error(
+			logger.Error(
 				"error",
 				slog.Any("error", err),
 				slog.String("data", string(data)),
@@ -346,7 +353,7 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 			var issue Issue
 			if err := json.Unmarshal(data, &issue); err != nil {
 				err = fmt.Errorf("error Unmarshaling json response: %w", err)
-				slog.Error(
+				logger.Error(
 					"error",
 					slog.Any("error", err),
 					slog.String("data", string(data)),
