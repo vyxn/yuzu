@@ -1,7 +1,11 @@
 // Package kitsu implements the provider interface for kitsu metadata
 package kitsu
 
-import "github.com/vyxn/yuzu/internal/standard"
+import (
+	"context"
+
+	"github.com/vyxn/yuzu/internal/standard"
+)
 
 type KitsuComicInfoProvider struct {
 	cache map[string]MangaInfo
@@ -12,8 +16,8 @@ func NewKitsuProvider() *KitsuComicInfoProvider {
 }
 
 func (p *KitsuComicInfoProvider) ProvideChapter(
-	series, chapter string,
-) *standard.ComicInfoChapter {
+	ctx context.Context, series, chapter string,
+) (*standard.ComicInfoChapter, error) {
 	mangaInfo, ok := p.cache[series]
 	if !ok {
 		seriesRes := GetSearchByName(series)

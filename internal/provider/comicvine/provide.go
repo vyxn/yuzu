@@ -1,52 +1,49 @@
+// Package comicvine implements the provider interface for comicvine metadata
 package comicvine
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/url"
-	"os"
 
-	"github.com/vyxn/yuzu/internal/pkg/log"
 	"github.com/vyxn/yuzu/internal/pkg/req"
+	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/standard"
 )
 
-var logger *slog.Logger
-
-func init() {
-	logger = log.NewLogger()
-}
-
 const baseURL = "http://comicvine.gamespot.com/api/volumes"
 
-var apiKey = os.Getenv("COMICVINE_API_KEY")
-
 type ComicVineComicInfoProvider struct {
-	// cache map[string]MangaInfo
+	apiKey string
 }
 
-func NewComicVineProvider() *ComicVineComicInfoProvider {
-	return &ComicVineComicInfoProvider{}
+func NewComicVineProvider(apiKey string) *ComicVineComicInfoProvider {
+	return &ComicVineComicInfoProvider{apiKey}
 }
 
 func (p *ComicVineComicInfoProvider) ProvideChapter(
-	series, chapter string,
-) *standard.ComicInfoChapter {
+	ctx context.Context, series, chapter string,
+) (*standard.ComicInfoChapter, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		panic(err)
+		return nil, yerr.WithStackf("parsing url <%s>: %w", baseURL, err)
 	}
 
+	slog.Debug("Apikey", slog.String("shh", p.apiKey))
+
 	q := u.Query()
-	q.Add("api_key", apiKey)
+	q.Add("api_key", p.apiKey)
 	q.Add("format", "json")
 	q.Add("filter", "name:"+series)
 	u.RawQuery = q.Encode()
 
-	data, _ := req.Get(context.Background(), u.String(), nil)
-	// logger.Info("resp", slog.String("data", string(data)))
+	slog.Info("start")
+	data, err := req.Get(ctx, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	slog.Info("response", slog.Any("data", string(data)))
 
 	type List struct {
 		Error                string `json:"error"`
@@ -100,20 +97,12 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 		Version string `json:"version"`
 	}
 	var list List
-	if err := json.Unmarshal(data, &list); err != nil {
-		err = fmt.Errorf("error Unmarshaling json response: %w", err)
-		logger.Error(
-			"error",
-			slog.Any("error", err),
-			slog.String("data", string(data)),
-		)
-		return nil
+	if err = json.Unmarshal(data, &list); err != nil {
+		return nil, yerr.WithStackf("unmarshaling json response: %w", err)
 	}
 
 	if list.StatusCode != 1 {
-		err = fmt.Errorf("error on comicvine response: %s", list.Error)
-		logger.Error("error", slog.Any("error", err))
-		return nil
+		return nil, yerr.WithStackf("comicvine response: %s", list.Error)
 	}
 
 	for n, e := range list.Results {
@@ -122,17 +111,18 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 		}
 		u, err := url.Parse(e.APIDetailURL)
 		if err != nil {
-			err = fmt.Errorf("error building url <%s>: %w", e.APIDetailURL, err)
-			logger.Error("error", slog.Any("error", err))
-			return nil
+			return nil, yerr.WithStackf("building url <%s>: %w", e.APIDetailURL, err)
 		}
 
 		q := u.Query()
-		q.Add("api_key", apiKey)
+		q.Add("api_key", p.apiKey)
 		q.Add("format", "json")
 		u.RawQuery = q.Encode()
 
-		data, _ := req.Get(context.Background(), u.String(), nil)
+		data, err := req.Get(ctx, u.String(), nil)
+		if err != nil {
+			return nil, err
+		}
 
 		type MangaInfo struct {
 			Error                string `json:"error"`
@@ -229,13 +219,7 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 		}
 		var manga MangaInfo
 		if err := json.Unmarshal(data, &manga); err != nil {
-			err = fmt.Errorf("error Unmarshaling json response: %w", err)
-			logger.Error(
-				"error",
-				slog.Any("error", err),
-				slog.String("data", string(data)),
-			)
-			return nil
+			return nil, yerr.WithStackf("unmarshaling json response: %w", err)
 		}
 
 		ci := &standard.ComicInfoChapter{
@@ -247,18 +231,19 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 			if issue.IssueNumber != chapter {
 				continue
 			}
-
 			u, err := url.Parse(issue.APIDetailURL)
 			if err != nil {
-				// TODO: handle this
-				panic(err)
+				return nil, yerr.WithStackf(
+					"building url <%s>: %w",
+					issue.APIDetailURL,
+					err,
+				)
 			}
 
 			u.RawQuery = q.Encode()
-			data, err := req.Get(context.Background(), u.String(), nil)
+			data, err := req.Get(ctx, u.String(), nil)
 			if err != nil {
-				// TODO: handle this
-				panic(err)
+				return nil, err
 			}
 
 			type Issue struct {
@@ -352,13 +337,7 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 			}
 			var issue Issue
 			if err := json.Unmarshal(data, &issue); err != nil {
-				err = fmt.Errorf("error Unmarshaling json response: %w", err)
-				logger.Error(
-					"error",
-					slog.Any("error", err),
-					slog.String("data", string(data)),
-				)
-				return nil
+				return nil, yerr.WithStackf("unmarshaling json response: %w", err)
 			}
 
 			ci.Title = issue.Results.Name
@@ -368,8 +347,8 @@ func (p *ComicVineComicInfoProvider) ProvideChapter(
 			break
 		}
 
-		return ci
+		return ci, nil
 	}
 
-	return nil
+	return nil, yerr.WithStackf("not found")
 }

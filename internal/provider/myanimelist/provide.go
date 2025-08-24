@@ -2,101 +2,63 @@
 package myanimelist
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"strconv"
 	"time"
 
-	"github.com/vyxn/yuzu/internal/pkg/log"
+	"github.com/vyxn/yuzu/internal/pkg/assert"
+	"github.com/vyxn/yuzu/internal/pkg/req"
+	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/standard"
 )
 
 const baseURL = "https://api.myanimelist.net/v2/manga"
 
-var clientID = os.Getenv("MYANIMELIST_CLIENT_ID")
-
-var logger *slog.Logger
-
-func init() {
-	logger = log.NewLogger()
-}
-
 type MyAnimeListComicInfoProvider struct {
-	// cache map[string]MangaInfo
+	clientID string
 }
 
-func NewMyAnimeListProvider() *MyAnimeListComicInfoProvider {
-	return &MyAnimeListComicInfoProvider{}
+func NewMyAnimeListProvider(clientID string) *MyAnimeListComicInfoProvider {
+	assert.Assert(
+		clientID != "",
+		"configure env MYANIMELIST_CLIENT_ID to use this provider",
+	)
+	return &MyAnimeListComicInfoProvider{clientID}
 }
 
 func (p *MyAnimeListComicInfoProvider) ProvideChapter(
-	series, chapter string,
-) *standard.ComicInfoChapter {
-	// mangaInfo, ok := p.cache[series]
-	// if !ok {
-	// 	mangaInfo = ParseMangaInfo(mangaInfoRes)
-	// 	p.cache[series] = mangaInfo
-	// }
-	res, err := getComicInfo(series)
+	ctx context.Context, series, chapter string,
+) (*standard.ComicInfoChapter, error) {
+	res, err := p.getComicInfo(ctx, series)
 	if err != nil {
-		logger.Error("error", slog.String("error", err.Error()))
-		return nil
+		return nil, fmt.Errorf("couldn't get MAL comicinfo: %w", err)
 	}
 
-	return res
+	return res, nil
 }
 
-func getURL(url string) ([]byte, error) {
-	logger.Info("→ r",
-		slog.String("url", url),
-		slog.String("method", http.MethodGet),
-	)
-
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("X-MAL-CLIENT-ID", clientID)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("bad status %s: %s: %w", resp.Status, string(b), err)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	return body, nil
-}
-
-func getBestMatchID(series string) (string, error) {
+func (p *MyAnimeListComicInfoProvider) getBestMatchID(
+	ctx context.Context,
+	series string,
+) (string, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return "", err
+		return "", yerr.WithStackf("parsing url %s: %w", baseURL, err)
 	}
 
 	params := url.Values{}
 	params.Add("q", series)
 	u.RawQuery = params.Encode()
 
-	data, err := getURL(u.String())
+	data, err := req.Get(
+		ctx,
+		u.String(),
+		map[string]string{"X-MAL-CLIENT-ID": p.clientID},
+	)
 	if err != nil {
 		return "", err
 	}
@@ -118,29 +80,30 @@ func getBestMatchID(series string) (string, error) {
 	}
 	var res ListResult
 	if err := json.Unmarshal(data, &res); err != nil {
-		return "", err
+		return "", yerr.WithStackf("unmarshalling json: %w", err)
 	}
 
 	for _, m := range res.Data {
 		return strconv.Itoa(m.Node.ID), nil
 	}
 
-	return "", nil
+	return "", yerr.WithStackf("not found")
 }
 
-func getComicInfo(series string) (*standard.ComicInfoChapter, error) {
-	id, err := getBestMatchID(series)
+func (p *MyAnimeListComicInfoProvider) getComicInfo(
+	ctx context.Context,
+	series string,
+) (*standard.ComicInfoChapter, error) {
+	id, err := p.getBestMatchID(ctx, series)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding series: %w", err)
 	}
 
-	if id == "" {
-		return nil, fmt.Errorf("error manga id not found for %s", series)
-	}
+	assert.Assert(id != "", "MAL returned empty id")
 
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return nil, err
+		return nil, yerr.WithStackf("parsing url %s: %w", baseURL, err)
 	}
 
 	u.Path = path.Join(u.Path, id)
@@ -152,7 +115,11 @@ func getComicInfo(series string) (*standard.ComicInfoChapter, error) {
 	)
 	u.RawQuery = params.Encode()
 
-	data, err := getURL(u.String())
+	data, err := req.Get(
+		ctx,
+		u.String(),
+		map[string]string{"X-MAL-CLIENT-ID": p.clientID},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +176,7 @@ func getComicInfo(series string) (*standard.ComicInfoChapter, error) {
 	}
 	var res MangaInfo
 	if err := json.Unmarshal(data, &res); err != nil {
-		return nil, err
+		return nil, yerr.WithStackf("unmarshalling json: %w", err)
 	}
 
 	return &standard.ComicInfoChapter{

@@ -16,7 +16,7 @@ import (
 	"github.com/vyxn/yuzu/internal/pkg/log"
 )
 
-var env = os.Getenv("YUZU_ENV")
+var env = os.Getenv("APP_ENV")
 
 func main() {
 	logger := log.NewLogger()

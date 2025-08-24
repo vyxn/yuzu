@@ -1,8 +1,15 @@
 // Package provider sets up interfaces to get metadata from different sources
 package provider
 
-import "github.com/vyxn/yuzu/internal/standard"
+import (
+	"context"
+
+	"github.com/vyxn/yuzu/internal/standard"
+)
 
 type ComicInfoProvider interface {
-	ProvideChapter(series, chapter string) *standard.ComicInfoChapter
+	ProvideChapter(
+		ctx context.Context,
+		series, chapter string,
+	) (*standard.ComicInfoChapter, error)
 }

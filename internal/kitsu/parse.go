@@ -143,7 +143,7 @@ func ParseMangaListSelfLink(data []byte) string {
 func ParseToComicInfoChapter(
 	seriesData MangaInfo,
 	chapterData MangaChapter,
-) *standard.ComicInfoChapter {
+) (*standard.ComicInfoChapter, error) {
 	manga := seriesData.Data.Attributes
 	chapter := chapterData.Data[0]
 
@@ -173,5 +173,5 @@ func ParseToComicInfoChapter(
 		ci.PageCount = chapter.Attributes.Length
 	}
 
-	return ci
+	return ci, nil
 }

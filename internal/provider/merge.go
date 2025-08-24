@@ -1,22 +1,28 @@
 package provider
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/vyxn/yuzu/internal/standard"
 )
 
 func MergedComicInfoChapter(
+	ctx context.Context,
 	series, chapter string,
 	providers ...ComicInfoProvider,
-) *standard.ComicInfoChapter {
+) (*standard.ComicInfoChapter, error) {
 	out := &standard.ComicInfoChapter{}
 
 	for _, p := range providers {
-		MergeStructs(out, p.ProvideChapter(series, chapter))
+		if ci, err := p.ProvideChapter(ctx, series, chapter); err == nil {
+			MergeStructs(out, ci)
+		} else {
+			return nil, err
+		}
 	}
 
-	return out
+	return out, nil
 }
 
 func MergeStructs(dst, src any) {

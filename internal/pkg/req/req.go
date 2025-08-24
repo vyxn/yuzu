@@ -3,20 +3,13 @@ package req
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/vyxn/yuzu/internal/pkg/log"
+	"github.com/vyxn/yuzu/internal/pkg/yerr"
 )
-
-var logger *slog.Logger
-
-func init() {
-	logger = log.NewLogger()
-}
 
 const timeout = 10 * time.Second
 
@@ -27,15 +20,15 @@ func Get(
 	url string,
 	headers map[string]string,
 ) ([]byte, error) {
-	logger.Info(
+	slog.Info(
 		"→ r",
 		slog.String("method", http.MethodGet),
 		slog.String("url", url),
 	)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, yerr.WithStackf("creating request <%s>: %w", url, err)
 	}
 
 	for k, v := range headers {
@@ -44,19 +37,19 @@ func Get(
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, yerr.WithStackf("fetching <%s>: %w", url, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK ||
 		resp.StatusCode >= http.StatusMultipleChoices {
 		b, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("error bad status <%s>: %s", resp.Status, string(b))
+		return nil, yerr.WithStackf("bad status <%s>: %s", resp.Status, string(b))
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
+		return nil, yerr.WithStackf("reading response body: %w", err)
 	}
 
 	return body, nil

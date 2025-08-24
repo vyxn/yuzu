@@ -1,21 +1,22 @@
 package lib
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 	"regexp"
 
-	// "github.com/vyxn/yuzu/internal/kitsu"
+	"github.com/vyxn/yuzu/internal/kitsu"
 	"github.com/vyxn/yuzu/internal/provider"
-	"github.com/vyxn/yuzu/internal/provider/myanimelist"
+	// "github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
 
 var re = regexp.MustCompile(`(?i)^.*?(?:chapter|ch|c)?\s?(\d+).*\.cbz$`)
 
 func Process(dir string) error {
-	// p := kitsu.NewKitsuProvider()
-	p := myanimelist.NewMyAnimeListProvider()
+	p := kitsu.NewKitsuProvider()
+	// p := myanimelist.NewMyAnimeListProvider()
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -64,7 +65,11 @@ func processChapter(
 		)
 		chapterNumber := matches[1]
 
-		ci := p.ProvideChapter(series, chapterNumber)
+		ci, err := p.ProvideChapter(context.Background(), series, chapterNumber)
+		if err != nil {
+			return err
+		}
+
 		f, err := os.Create(
 			path.Join(dir, fmt.Sprintf("%s.ComicInfo.xml", chapterNumber)),
 		)

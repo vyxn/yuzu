@@ -3,17 +3,29 @@ package internal
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal/kitsu"
 	"github.com/vyxn/yuzu/internal/lib"
 	"github.com/vyxn/yuzu/internal/pkg/assert"
+	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/provider"
 	"github.com/vyxn/yuzu/internal/provider/comicvine"
 	"github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
 
+var providerComicVine provider.ComicInfoProvider
+var providerMyAnimeList provider.ComicInfoProvider
+
 func SetupRoutes(e *echo.Echo) {
+	providerComicVine = comicvine.NewComicVineProvider(
+		os.Getenv("COMICVINE_API_KEY"),
+	)
+	providerMyAnimeList = myanimelist.NewMyAnimeListProvider(
+		os.Getenv("MYANIMELIST_CLIENT_ID"),
+	)
+
 	e.GET("/", hello)
 	e.GET("/mangaInfo", hMangaInfo)
 	e.GET("/mangaChapters", hMangaChapters)
@@ -23,6 +35,11 @@ func SetupRoutes(e *echo.Echo) {
 
 // Handler
 func hello(c echo.Context) error {
+	e := c.QueryParam("e")
+	if e != "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "error on hello").
+			SetInternal(fmt.Errorf("wrapped with something: %w", yerr.WithStackf("test yerr")))
+	}
 	return c.String(http.StatusOK, "Hello, World!")
 }
 
@@ -66,20 +83,26 @@ func hComicInfo(c echo.Context) error {
 	ps := []provider.ComicInfoProvider{}
 	switch prov {
 	case "comicvine":
-		ps = append(ps, comicvine.NewComicVineProvider())
+		ps = append(ps, providerComicVine)
 	case "kitsu":
 		ps = append(ps, kitsu.NewKitsuProvider())
 	case "myanimelist":
-		ps = append(ps, myanimelist.NewMyAnimeListProvider())
+		ps = append(ps, providerMyAnimeList)
 	default:
-		ps = append(ps, myanimelist.NewMyAnimeListProvider())
+		ps = append(ps, providerComicVine, providerMyAnimeList)
 		ps = append(ps, kitsu.NewKitsuProvider())
 
 	}
-	ci := provider.MergedComicInfoChapter(series, chapter, ps...)
+	ci, err := provider.MergedComicInfoChapter(
+		c.Request().Context(),
+		series,
+		chapter,
+		ps...)
+	if err != nil {
+		return echo.ErrNotFound.SetInternal(err)
+	}
 
 	assert.Assert(ci != nil, "we should have a comicinfochapter here")
-
 	return c.XML(http.StatusOK, ci)
 }
 
