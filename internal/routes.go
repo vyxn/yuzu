@@ -1,6 +1,7 @@
 package internal
 
 import (
+	_ "embed"
 	"fmt"
 	"net/http"
 	"os"
@@ -15,6 +16,9 @@ import (
 	"github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
 
+//go:embed static/favicon.ico
+var favicon []byte
+
 var providerComicVine provider.ComicInfoProvider
 var providerMyAnimeList provider.ComicInfoProvider
 
@@ -25,6 +29,10 @@ func SetupRoutes(e *echo.Echo) {
 	providerMyAnimeList = myanimelist.NewMyAnimeListProvider(
 		os.Getenv("MYANIMELIST_CLIENT_ID"),
 	)
+
+	e.GET("/favicon.ico", func(c echo.Context) error {
+		return c.Blob(http.StatusOK, "image/x-icon", favicon)
+	})
 
 	e.GET("/", hello)
 	e.GET("/mangaInfo", hMangaInfo)
