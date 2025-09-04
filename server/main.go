@@ -14,6 +14,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal"
 	"github.com/vyxn/yuzu/internal/pkg/log"
+	"github.com/vyxn/yuzu/internal/provider"
 )
 
 var env = os.Getenv("APP_ENV")
@@ -35,8 +36,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	err := provider.Setup()
+	if err != nil {
+		panic(err)
+	}
+
+	for _, p := range provider.Providers {
+		p.Run(map[string]string{"series": "one piece", "chapter": "3"})
+	}
+	return
+
 	db := internal.GetDB()
-	err := db.Ping()
+	err = db.Ping()
 	if err != nil {
 		panic(err)
 	}

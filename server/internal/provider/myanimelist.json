@@ -1,7 +1,7 @@
 {
-	"providerName": "myanimelist",
+	"id": "myanimelist",
 	"inputs": {
-		"series": "%series%",
+		"series": "_series_",
 		"chapter": "%chapter%"
 	},
 	"envs": {
@@ -16,7 +16,7 @@
 			"method": "GET",
 			"path": "",
 			"urlParams": {
-				"q": "%series%"
+				"q": "_series_"
 			},
 			"responseType": "json",
 			"cache": true,
