@@ -1,22 +1,24 @@
 {
   "id": "myanimelist",
-  "inputs": {
-    "series": "_series_",
-    "chapter": "%chapter%"
-  },
   "envs": {
     "MYANIMELIST_CLIENT_ID": "%clientId%"
   },
-  "baseUrl": "https://api.myanimelist.net/v2/manga",
+  "vars": {
+    "%baseUrl%": "https://api.myanimelist.net/v2/manga"
+  },
+  "inputs": {
+    "series": "%series%",
+    "chapter": "%chapter%"
+  },
   "headers": {
     "X-MAL-CLIENT-ID": "%clientId%"
   },
   "endpoints": [
-    {
+   {
       "method": "GET",
-      "path": "",
-      "urlParams": {
-        "q": "_series_"
+      "url": "%baseUrl%",
+      "params": {
+        "q": "%series%"
       },
       "responseType": "json",
       "cache": true,
@@ -26,8 +28,8 @@
     },
     {
       "method": "GET",
-      "path": "/%seriesId%",
-      "urlParams": {
+      "url": "%baseUrl%/%seriesId%",
+      "params": {
         "fields": "id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_list_users,num_scoring_users,nsfw,created_at,updated_at,media_type,status,genres,my_list_status,num_volumes,num_chapters,authors{first_name,last_name},background,serialization{name}"
       },
       "bodyParams": [

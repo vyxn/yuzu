@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"maps"
@@ -27,7 +26,7 @@ type Provider struct {
 	ID        string            `json:"id"`
 	Inputs    map[string]string `json:"inputs"`
 	Envs      map[string]string `json:"envs"`
-	BaseURL   string            `json:"baseUrl"`
+	Vars      map[string]string `json:"vars"`
 	Headers   map[string]string `json:"headers"`
 	Endpoints []Endpoint        `json:"endpoints"`
 	Output    Output            `json:"output"`
@@ -36,10 +35,10 @@ type Provider struct {
 
 type Endpoint struct {
 	Method       string            `json:"method"`
-	Path         string            `json:"path"`
-	URLParams    map[string]string `json:"urlParams,omitempty"`
+	Url          string            `json:"url"`
+	Params       map[string]string `json:"params,omitempty"`
 	Headers      map[string]string `json:"headers"`
-	BodyParams   []string          `json:"bodyParams,omitempty"`
+	Body         []string          `json:"body,omitempty"`
 	Cache        bool              `json:"cache,omitempty"`
 	ResponseType string            `json:"responseType,omitempty"`
 	Result       map[string]string `json:"result,omitempty"`
@@ -68,6 +67,7 @@ func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
 	// Merging os.env and inputs for this run environment values
 	runEnv := make(map[string]string)
 	maps.Copy(runEnv, p.Envs)
+	maps.Copy(runEnv, p.Vars)
 	for k, v := range p.Inputs {
 		runEnv[v] = inputs[k]
 	}
@@ -77,15 +77,14 @@ func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
 	ctx := context.Background()
 	client := &http.Client{Timeout: 10 * time.Second}
 	for _, e := range p.Endpoints {
-		path := getFromRunEnv(runEnv, e.Path)
-		u, err := url.Parse(fmt.Sprintf("%s%s", p.BaseURL, path))
+		u, err := url.Parse(getFromRunEnv(runEnv, e.Url))
 		if err != nil {
-			return nil, yerr.WithStackf("parsing url <%s>: %w", p.BaseURL, err)
+			return nil, yerr.WithStackf("parsing url <%s> -> <%s>: %w", e.Url, u, err)
 		}
 		slog.Info("formed url", slog.String("url", u.String()))
 
 		q := u.Query()
-		for k, v := range e.URLParams {
+		for k, v := range e.Params {
 			q.Add(k, getFromRunEnv(runEnv, v))
 		}
 		u.RawQuery = q.Encode()
@@ -152,7 +151,6 @@ func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
 			}
 
 		}
-		// println(fmt.Sprintf("%+v", runEnv))
 	}
 
 	output := map[string]any{}
