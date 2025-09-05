@@ -12,7 +12,10 @@ import (
 var re = regexp.MustCompile(`(?i)^.*?(?:chapter|ch|c)?\s?(\d+).*\.cbz$`)
 
 func Process(dir string) error {
-	p := provider.Providers["kitsu"]
+	p, ok := provider.Providers.Load("kitsu")
+	if !ok {
+		return fmt.Errorf("do better this error")
+	}
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -21,7 +24,7 @@ func Process(dir string) error {
 
 	for _, e := range entries {
 		if e.Type().IsDir() {
-			processSeries(p, path.Join(dir, e.Name()), e.Name())
+			processSeries(p.(*provider.Provider), path.Join(dir, e.Name()), e.Name())
 		}
 	}
 
@@ -61,7 +64,9 @@ func processChapter(
 		)
 		chapterNumber := matches[1]
 
-		ci, err := p.Run(map[string]string{"series": series, "chapter": chapterNumber})
+		ci, err := p.Run(
+			map[string]string{"series": series, "chapter": chapterNumber},
+		)
 		if err != nil {
 			return err
 		}

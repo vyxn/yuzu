@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/vyxn/yuzu/internal/lib"
+	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/provider"
 
@@ -25,8 +26,11 @@ func SetupRoutes(e *echo.Echo) {
 	})
 
 	e.GET("/", hello)
-	e.GET("/providers/:id/run", hComicInfo)
 	e.GET("/lib", hLib)
+	e.GET("/providers/:id", hProvider)
+	e.GET("/providers/:id/run", hComicInfo)
+
+	// Debug
 	e.POST("/jsonPath", hJsonPath)
 }
 
@@ -45,7 +49,10 @@ func hComicInfo(c echo.Context) error {
 	chapter := c.QueryParam("c")
 	prov := c.Param("id")
 
-	if p, ok := provider.Providers[prov]; ok {
+	if p, ok := provider.Providers.Load(prov); ok {
+		p, ok := p.(*provider.Provider)
+		assert.Assert(ok, "found unexpected type in providers map")
+
 		data, err := p.Run(map[string]string{
 			"series":  series,
 			"chapter": chapter,
@@ -90,4 +97,14 @@ func hJsonPath(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, out)
+}
+
+func hProvider(c echo.Context) error {
+	id := c.Param("id")
+
+	if p, ok := provider.Providers.Load(id); ok {
+		return c.JSON(http.StatusOK, p)
+	}
+
+	return echo.ErrNotFound
 }

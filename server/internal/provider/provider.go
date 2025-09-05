@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AsaiYusuke/jsonpath/v2"
@@ -44,7 +45,7 @@ type Output struct {
 	Content map[string]string `json:"content"`
 }
 
-var Providers = make(map[string]*Provider)
+var Providers = sync.Map{}
 
 func (p *Provider) MimeType() string {
 	switch p.Output.Type {

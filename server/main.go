@@ -20,6 +20,9 @@ import (
 var env = os.Getenv("APP_ENV")
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	logger := log.NewLogger()
 	slog.SetDefault(logger)
 
@@ -41,10 +44,7 @@ func main() {
 		panic(err)
 	}
 
-	// for _, p := range provider.Providers {
-	// 	p.Run(map[string]string{"series": "one piece", "chapter": "3"})
-	// }
-	// return
+	go provider.Watch(ctx, "config/providers")
 
 	db := internal.GetDB()
 	err = db.Ping()
@@ -75,7 +75,7 @@ func main() {
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel = context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	if err := e.Shutdown(ctx); err != nil {
 		slog.Error("error stopping the server", slog.Any("error", err))
