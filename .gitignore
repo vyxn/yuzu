@@ -26,4 +26,4 @@ vite.config.ts.timestamp-*
 
 *.db
 *.db-*
-/testlib
+/server/testlib

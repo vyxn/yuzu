@@ -33,5 +33,9 @@
 		"typescript": "^5.0.0",
 		"typescript-eslint": "^8.20.0",
 		"vite": "^7.0.4"
+	},
+	"dependencies": {
+		"wx-filemanager-data-provider": "^2.2.0",
+		"wx-svelte-filemanager": "^2.2.0"
 	}
 }

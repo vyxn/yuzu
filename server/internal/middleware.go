@@ -13,6 +13,9 @@ import (
 func SetupMiddleware(e *echo.Echo) {
 	e.Use(
 		mRequestID,
+		middleware.CORSWithConfig(middleware.CORSConfig{
+			AllowOrigins: []string{"http://localhost:5173"},
+		}),
 		middleware.RecoverWithConfig(middleware.RecoverConfig{
 			LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
 				slog.ErrorContext(

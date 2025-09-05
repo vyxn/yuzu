@@ -3,8 +3,17 @@ package internal
 import (
 	_ "embed"
 	"fmt"
+	"io/fs"
+	"log/slog"
+	"path"
+	"regexp"
+	"strings"
+
+	// "log/slog"
 	"net/http"
+	"net/url"
 	"os"
+	"path/filepath"
 
 	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal/kitsu"
@@ -39,6 +48,10 @@ func SetupRoutes(e *echo.Echo) {
 	e.GET("/mangaChapters", hMangaChapters)
 	e.GET("/comicinfo", hComicInfo)
 	e.GET("/lib", hLib)
+
+	// More UI focused
+	e.GET("/libraries/files", hLibraryFileTree)
+	e.GET("/libraries/files/:path", hLibraryFileTree)
 }
 
 // Handler
@@ -120,4 +133,97 @@ func hLib(c echo.Context) error {
 		panic(err)
 	}
 	return c.String(http.StatusOK, "all good")
+}
+
+type FSEntry struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	Date string `json:"date"`
+	Size *int64 `json:"size,omitempty"`
+}
+
+// TODO: handle error with more sense than this
+func hLibraryFileTree(c echo.Context) error {
+	var err error
+	p := c.Param("path")
+	p, err = url.QueryUnescape(p)
+	if err != nil {
+		return yerr.WithStackf("unescaping path <%s>: %w", p, err)
+	}
+
+	root := "/testlib"
+	if p != "" && p != "/" {
+		root = p
+	}
+	slog.Info("root", slog.String("p", p), slog.String("root", root))
+
+	q := c.QueryParam("q")
+	var re *regexp.Regexp
+	if strings.Contains(q, "/") {
+		pattern := strings.Trim(q, "/")
+		slog.Info(
+			"regex pattern",
+			slog.String("q", q),
+			slog.String("pattern", pattern),
+		)
+		re, err = regexp.Compile(pattern)
+		if err != nil {
+			return yerr.WithStackf("compiling search regexp <%s>: %w", q, err)
+		}
+	}
+
+	rootNoPrefix := strings.TrimPrefix(root, "/")
+
+	fsEntries := []FSEntry{}
+	err = filepath.WalkDir(
+		strings.TrimPrefix(root, "/"),
+		func(path string, d fs.DirEntry, err error) error {
+			if p != "" && p != "/" && path == rootNoPrefix {
+				return nil
+			}
+
+			if q != "" && re != nil {
+				if !re.MatchString(path) {
+					return nil
+				}
+			} else if q != "" {
+				if !strings.Contains(path, q) {
+					return nil
+				}
+			}
+
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+
+			// slog.Info(
+			// 	"fs entry",
+			// 	slog.String("path", path),
+			// 	slog.String("name", d.Name()),
+			// 	slog.String("type", d.Type().String()),
+			// )
+
+			t := "file"
+			sz := info.Size()
+			s := &sz
+			if d.IsDir() {
+				t = "folder"
+				s = nil
+			}
+
+			fsEntries = append(fsEntries, FSEntry{
+				ID:   "/" + path,
+				Type: t,
+				Date: info.ModTime().UTC().Format("2006-01-02 15:04:05"),
+				Size: s,
+			})
+			return nil
+		},
+	)
+	if err != nil {
+		return echo.ErrNotFound.SetInternal(err)
+	}
+
+	return c.JSON(http.StatusOK, fsEntries)
 }

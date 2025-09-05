@@ -1,2 +1,13 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<script lang="ts">
+	import { Filemanager, Willow } from "wx-svelte-filemanager";
+
+	let { data } = $props();
+	const drive = {
+		used: 15200000000,
+		total: 50000000000,
+	};
+</script>
+
+<Willow>
+	<Filemanager init={data.init} data={data.data} {drive} onrequestdata={data.loadData} />
+</Willow>
