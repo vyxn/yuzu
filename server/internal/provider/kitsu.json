@@ -1,0 +1,59 @@
+{
+  "id": "kitsu",
+  "inputs": {
+    "series": "%series%",
+    "chapter": "%chapter%"
+  },
+  "vars": {
+    "%baseUrl%": "https://kitsu.io/api/edge"
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "url": "%baseUrl%/manga",
+      "params": {
+        "filter[text]": "%series%"
+      },
+      "responseType": "json",
+      "cache": true,
+      "result": {
+        "%seriesLink%": "$.data[0].links.self"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "%seriesLink%",
+      "responseType": "json",
+      "cache": true,
+      "result": {
+        "%seriesId%": "$.data.id",
+        "%seriesName%": "$.data.attributes.canonicalTitle"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "%baseUrl%/chapters/%seriesId%",
+      "responseType": "json",
+      "cache": true,
+      "params": {
+        "filter[number]": "%chapter%"
+      },
+      "result": {
+        "%chapterTitle%": "$.data.attributes.canonicalTitle",
+        "%chapterNumber%": "$.data.attributes.number",
+        "%chapterDescription%": "$.data.attributes.description"
+      }
+    }
+  ],
+  "output": {
+    "type": "xml",
+    "schema": "https://github.com/anansi-project/comicinfo/blob/main/drafts/v2.1/ComicInfo.xsd",
+    "content": {
+      "Series": "%seriesName%",
+      "Title": "%chapterTitle%",
+      "Number": "%chapterNumber%",
+      "Summary": "%chapterDescription%"
+    }
+  }
+}
+

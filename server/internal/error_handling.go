@@ -8,8 +8,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
+
+	"github.com/labstack/echo/v4"
 )
 
 var isDev = os.Getenv("APP_ENV") != "production"

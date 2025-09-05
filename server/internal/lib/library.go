@@ -1,22 +1,18 @@
 package lib
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path"
 	"regexp"
 
-	"github.com/vyxn/yuzu/internal/kitsu"
 	"github.com/vyxn/yuzu/internal/provider"
-	// "github.com/vyxn/yuzu/internal/provider/myanimelist"
 )
 
 var re = regexp.MustCompile(`(?i)^.*?(?:chapter|ch|c)?\s?(\d+).*\.cbz$`)
 
 func Process(dir string) error {
-	p := kitsu.NewKitsuProvider()
-	// p := myanimelist.NewMyAnimeListProvider()
+	p := provider.Providers["kitsu"]
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -32,7 +28,7 @@ func Process(dir string) error {
 	return nil
 }
 
-func processSeries(p provider.ComicInfoProvider, dir, series string) error {
+func processSeries(p *provider.Provider, dir, series string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -48,7 +44,7 @@ func processSeries(p provider.ComicInfoProvider, dir, series string) error {
 }
 
 func processChapter(
-	p provider.ComicInfoProvider,
+	p *provider.Provider,
 	dir, series, chapter string,
 ) error {
 	if path.Ext(chapter) != ".cbz" {
@@ -65,7 +61,7 @@ func processChapter(
 		)
 		chapterNumber := matches[1]
 
-		ci, err := p.ProvideChapter(context.Background(), series, chapterNumber)
+		ci, err := p.Run(map[string]string{"series": series, "chapter": chapterNumber})
 		if err != nil {
 			return err
 		}
@@ -77,7 +73,7 @@ func processChapter(
 			return err
 		}
 
-		if err := ci.Encode(f); err != nil {
+		if _, err := f.Write(ci); err != nil {
 			return err
 		}
 	}

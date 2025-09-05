@@ -16,18 +16,12 @@ import (
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 )
 
-// .config/meta-yuzu/providers/*.json discover all jsons in there
-// TODO on setup create folder structure + copy the ones in project for the time being
-// TODO xml response support
-// TODO include json path library to access results
-// TODO return compiled output value
-
 type Provider struct {
 	ID        string            `json:"id"`
 	Inputs    map[string]string `json:"inputs"`
-	Envs      map[string]string `json:"envs"`
-	Vars      map[string]string `json:"vars"`
-	Headers   map[string]string `json:"headers"`
+	Envs      map[string]string `json:"envs,omitempty"`
+	Vars      map[string]string `json:"vars,omitempty"`
+	Headers   map[string]string `json:"headers,omitempty"`
 	Endpoints []Endpoint        `json:"endpoints"`
 	Output    Output            `json:"output"`
 	Schema    string            `json:"schema"`
@@ -135,6 +129,7 @@ func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
 		for k, v := range e.Result {
 			out, err := jsonpath.Retrieve(getFromRunEnv(runEnv, v), result)
 			if err != nil {
+				slog.Info("result value", slog.Any("result", result))
 				return nil, yerr.WithStackf("retrieving jsonpath: %w", err)
 			}
 
@@ -149,6 +144,9 @@ func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
 				} else {
 					runEnv[k] = "false"
 				}
+			// TODO perhaps this does not make sense if we move to map[string]any
+			case nil:
+				runEnv[k] = ""
 			default:
 				return nil, yerr.WithStackf("retrieved value has unsupported type <%v>: %w", v, err)
 			}
