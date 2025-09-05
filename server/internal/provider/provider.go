@@ -8,9 +8,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/AsaiYusuke/jsonpath/v2"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 )
 
@@ -27,7 +29,7 @@ type Provider struct {
 	BaseURL   string            `json:"baseUrl"`
 	Headers   map[string]string `json:"headers"`
 	Endpoints []Endpoint        `json:"endpoints"`
-	Output    map[string]string `json:"output"`
+	Output    Output            `json:"output"`
 	Schema    string            `json:"schema"`
 }
 
@@ -40,6 +42,12 @@ type Endpoint struct {
 	Cache        bool              `json:"cache,omitempty"`
 	ResponseType string            `json:"responseType,omitempty"`
 	Result       map[string]string `json:"result,omitempty"`
+}
+
+type Output struct {
+	Type    string            `json:"type"`
+	Schema  string            `json:"schema"`
+	Content map[string]string `json:"content"`
 }
 
 var Providers = make(map[string]*Provider)
@@ -56,7 +64,7 @@ func (p *Provider) Run(inputs map[string]string) {
 
 	ctx := context.Background()
 	client := &http.Client{Timeout: 10 * time.Second}
-	for i, e := range p.Endpoints {
+	for _, e := range p.Endpoints {
 		path := getFromRunEnv(runEnv, e.Path)
 		u, err := url.Parse(fmt.Sprintf("%s%s", p.BaseURL, path))
 		if err != nil {
@@ -100,21 +108,67 @@ func (p *Provider) Run(inputs map[string]string) {
 		}
 
 		println(string(body))
-		var result map[string]any
+		var result any
 		err = json.Unmarshal(body, &result)
 		if err != nil {
 			panic(err)
 		}
 
-		for k := range e.Result {
-			if i == 0 {
-				runEnv[k] = fmt.Sprintf("%v", result["data"].([]any)[0].(map[string]any)["node"].(map[string]any)["id"].(float64))
+		for k, v := range e.Result {
+			out, err := jsonpath.Retrieve(v, result)
+			if err != nil {
+				println(yerr.WithStackf("retrieving jsonpath: %w", err).Error())
 			}
-			if i == 1 {
-				runEnv[k] = result[k].(string)
+
+			switch v := out[0].(type) {
+			case string:
+				runEnv[k] = v
+			case float64:
+				runEnv[k] = strconv.FormatFloat(v, 'f', -1, 64)
+			case bool:
+				if v {
+					runEnv[k] = "true"
+				} else {
+					runEnv[k] = "false"
+				}
+			default:
+				println(yerr.WithStackf("parsing jsonpath output: %w", err).Error())
 			}
+
 		}
-		println(fmt.Sprintf("%+v", runEnv))
+		// println(fmt.Sprintf("%+v", runEnv))
+
+		// Generate Output
+		switch p.Output.Type {
+		case "json":
+			js := map[string]any{}
+			for k, v := range p.Output.Content {
+				js[k] = getFromRunEnv(runEnv, v)
+			}
+
+			data, _ := json.MarshalIndent(js, "", "  ")
+
+			slog.Info("output", slog.String("provider", p.Id), slog.Any("output", js))
+			println(string(data))
+		case "xml":
+			js := map[string]any{}
+			for k, v := range p.Output.Content {
+				js[k] = getFromRunEnv(runEnv, v)
+			}
+			data, err := MapToXML(js, "content")
+			// data, err := xml.MarshalIndent(js, "", "  ")
+			if err != nil {
+				println(yerr.WithStackf("marshalling to xml: %w", err).Error())
+			}
+
+			slog.Info("output", slog.String("provider", p.Id), slog.Any("output", js))
+			println(string(data))
+
+		default:
+			println(
+				yerr.WithStackf("output type %s not supported", p.Output.Type).Error(),
+			)
+		}
 	}
 }
 
