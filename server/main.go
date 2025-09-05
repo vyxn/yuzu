@@ -41,10 +41,10 @@ func main() {
 		panic(err)
 	}
 
-	for _, p := range provider.Providers {
-		p.Run(map[string]string{"series": "one piece", "chapter": "3"})
-	}
-	return
+	// for _, p := range provider.Providers {
+	// 	p.Run(map[string]string{"series": "one piece", "chapter": "3"})
+	// }
+	// return
 
 	db := internal.GetDB()
 	err = db.Ping()

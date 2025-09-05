@@ -27,7 +27,7 @@ func encodeMap(enc *xml.Encoder, m map[string]any) error {
 func MapToXML(m map[string]any, root string) ([]byte, error) {
 	buf := &bytes.Buffer{}
 	enc := xml.NewEncoder(buf)
-
+	enc.EncodeToken(xml.Header)
 	start := xml.StartElement{Name: xml.Name{Local: root}}
 	enc.EncodeToken(start)
 	encodeMap(enc, m)

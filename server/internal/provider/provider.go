@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -23,7 +24,7 @@ import (
 // TODO return compiled output value
 
 type Provider struct {
-	Id        string            `json:"id"`
+	ID        string            `json:"id"`
 	Inputs    map[string]string `json:"inputs"`
 	Envs      map[string]string `json:"envs"`
 	BaseURL   string            `json:"baseUrl"`
@@ -52,15 +53,26 @@ type Output struct {
 
 var Providers = make(map[string]*Provider)
 
-func (p *Provider) Run(inputs map[string]string) {
+func (p *Provider) MimeType() string {
+	switch p.Output.Type {
+	case "json":
+		return "application/json"
+	case "xml":
+		return "application/xml"
+	default:
+		return ""
+	}
+}
+
+func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
 	// Merging os.env and inputs for this run environment values
 	runEnv := make(map[string]string)
-	for k, v := range p.Envs {
-		runEnv[k] = v
-	}
+	maps.Copy(runEnv, p.Envs)
 	for k, v := range p.Inputs {
 		runEnv[v] = inputs[k]
 	}
+
+	slog.Info("runEnv", slog.Any("", runEnv))
 
 	ctx := context.Background()
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -68,7 +80,7 @@ func (p *Provider) Run(inputs map[string]string) {
 		path := getFromRunEnv(runEnv, e.Path)
 		u, err := url.Parse(fmt.Sprintf("%s%s", p.BaseURL, path))
 		if err != nil {
-			println(yerr.WithStackf("parsing url <%s>: %w", p.BaseURL, err).Error())
+			return nil, yerr.WithStackf("parsing url <%s>: %w", p.BaseURL, err)
 		}
 		slog.Info("formed url", slog.String("url", u.String()))
 
@@ -80,7 +92,7 @@ func (p *Provider) Run(inputs map[string]string) {
 
 		r, err := http.NewRequestWithContext(ctx, e.Method, u.String(), nil)
 		if err != nil {
-			println(yerr.WithStackf("creating request <%s>: %w", u.String(), err))
+			return nil, yerr.WithStackf("creating request <%s>: %w", u.String(), err)
 		}
 
 		for k, v := range p.Headers {
@@ -92,32 +104,36 @@ func (p *Provider) Run(inputs map[string]string) {
 
 		resp, err := client.Do(r)
 		if err != nil {
-			println(yerr.WithStackf("fetching <%s>: %w", u.String(), err))
+			return nil, yerr.WithStackf("fetching <%s>: %w", u.String(), err)
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode < http.StatusOK ||
 			resp.StatusCode >= http.StatusMultipleChoices {
 			b, _ := io.ReadAll(resp.Body)
-			println(yerr.WithStackf("bad status <%s>: %s", resp.Status, string(b)))
+			return nil, yerr.WithStackf("bad status <%s>: %s", resp.Status, string(b))
 		}
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			println(yerr.WithStackf("reading response body: %w", err))
+			return nil, yerr.WithStackf("reading response body: %w", err)
 		}
 
-		println(string(body))
 		var result any
 		err = json.Unmarshal(body, &result)
 		if err != nil {
-			panic(err)
+			return nil, yerr.WithStackf(
+				"unmarshalling endpoint <%s> response: %w\n%s",
+				u.String(),
+				err,
+				string(body),
+			)
 		}
 
 		for k, v := range e.Result {
 			out, err := jsonpath.Retrieve(v, result)
 			if err != nil {
-				println(yerr.WithStackf("retrieving jsonpath: %w", err).Error())
+				return nil, yerr.WithStackf("retrieving jsonpath: %w", err)
 			}
 
 			switch v := out[0].(type) {
@@ -132,43 +148,37 @@ func (p *Provider) Run(inputs map[string]string) {
 					runEnv[k] = "false"
 				}
 			default:
-				println(yerr.WithStackf("parsing jsonpath output: %w", err).Error())
+				return nil, yerr.WithStackf("retrieved value has unsupported type <%v>: %w", v, err)
 			}
 
 		}
 		// println(fmt.Sprintf("%+v", runEnv))
+	}
 
-		// Generate Output
-		switch p.Output.Type {
-		case "json":
-			js := map[string]any{}
-			for k, v := range p.Output.Content {
-				js[k] = getFromRunEnv(runEnv, v)
-			}
+	output := map[string]any{}
+	for k, v := range p.Output.Content {
+		output[k] = getFromRunEnv(runEnv, v)
+	}
 
-			data, _ := json.MarshalIndent(js, "", "  ")
-
-			slog.Info("output", slog.String("provider", p.Id), slog.Any("output", js))
-			println(string(data))
-		case "xml":
-			js := map[string]any{}
-			for k, v := range p.Output.Content {
-				js[k] = getFromRunEnv(runEnv, v)
-			}
-			data, err := MapToXML(js, "content")
-			// data, err := xml.MarshalIndent(js, "", "  ")
-			if err != nil {
-				println(yerr.WithStackf("marshalling to xml: %w", err).Error())
-			}
-
-			slog.Info("output", slog.String("provider", p.Id), slog.Any("output", js))
-			println(string(data))
-
-		default:
-			println(
-				yerr.WithStackf("output type %s not supported", p.Output.Type).Error(),
-			)
+	// Generate Output
+	switch p.Output.Type {
+	case "json":
+		data, err := json.MarshalIndent(output, "", "  ")
+		if err != nil {
+			return nil, yerr.WithStackf("marshalling to json: %w", err)
 		}
+
+		return data, nil
+	case "xml":
+		data, err := MapToXML(output, "content")
+		if err != nil {
+			return nil, yerr.WithStackf("marshalling to xml: %w", err)
+		}
+
+		return data, nil
+
+	default:
+		return nil, yerr.WithStackf("output type %s not supported", p.Output.Type)
 	}
 }
 

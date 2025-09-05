@@ -9,7 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal/kitsu"
 	"github.com/vyxn/yuzu/internal/lib"
-	"github.com/vyxn/yuzu/internal/pkg/assert"
+	// "github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/provider"
 	"github.com/vyxn/yuzu/internal/provider/comicvine"
@@ -88,30 +88,41 @@ func hComicInfo(c echo.Context) error {
 	chapter := c.QueryParam("c")
 	prov := c.QueryParam("p")
 
-	ps := []provider.ComicInfoProvider{}
-	switch prov {
-	case "comicvine":
-		ps = append(ps, providerComicVine)
-	case "kitsu":
-		ps = append(ps, kitsu.NewKitsuProvider())
-	case "myanimelist":
-		ps = append(ps, providerMyAnimeList)
-	default:
-		ps = append(ps, providerComicVine, providerMyAnimeList)
-		ps = append(ps, kitsu.NewKitsuProvider())
-
+	if p, ok := provider.Providers[prov]; ok {
+		data, err := p.Run(map[string]string{
+			"series":  series,
+			"chapter": chapter,
+		})
+		if err != nil {
+			return echo.ErrBadRequest.SetInternal(err)
+		}
+		return c.Blob(http.StatusOK, p.MimeType(), data)
 	}
-	ci, err := provider.MergedComicInfoChapter(
-		c.Request().Context(),
-		series,
-		chapter,
-		ps...)
-	if err != nil {
-		return echo.ErrNotFound.SetInternal(err)
-	}
+	// ps := []provider.ComicInfoProvider{}
+	// switch prov {
+	// case "comicvine":
+	// 	ps = append(ps, providerComicVine)
+	// case "kitsu":
+	// 	ps = append(ps, kitsu.NewKitsuProvider())
+	// case "myanimelist":
+	// 	ps = append(ps, providerMyAnimeList)
+	// default:
+	// 	ps = append(ps, providerComicVine, providerMyAnimeList)
+	// 	ps = append(ps, kitsu.NewKitsuProvider())
+	//
+	// }
+	// ci, err := provider.MergedComicInfoChapter(
+	// 	c.Request().Context(),
+	// 	series,
+	// 	chapter,
+	// 	ps...)
+	// if err != nil {
+	// 	return echo.ErrNotFound.SetInternal(err)
+	// }
 
-	assert.Assert(ci != nil, "we should have a comicinfochapter here")
-	return c.XML(http.StatusOK, ci)
+	// assert.Assert(ci != nil, "we should have a comicinfochapter here")
+	// return c.XML(http.StatusOK, ci)
+	return nil
 }
 
 func hLib(c echo.Context) error {

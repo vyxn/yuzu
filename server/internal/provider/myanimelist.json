@@ -41,7 +41,7 @@
     }
   ],
   "output": {
-    "type": "xml",
+    "type": "json",
     "schema": "https://github.com/anansi-project/comicinfo/blob/main/drafts/v2.1/ComicInfo.xsd",
     "content": {
       "series": "title",

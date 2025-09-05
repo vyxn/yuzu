@@ -3,6 +3,7 @@ package provider
 import (
 	"encoding/json"
 	"io"
+	"io/fs"
 	"log/slog"
 	"maps"
 	"os"
@@ -15,14 +16,15 @@ import (
 
 func Setup() error {
 	basePath := "internal/provider/"
+
 	var jsonFiles []string
-	err := filepath.Walk(
+	err := filepath.WalkDir(
 		basePath,
-		func(p string, i os.FileInfo, err error) error {
+		func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
 				slog.Warn("walking file on provider dir", slog.Any("err", err))
 			}
-			if !i.IsDir() && path.Ext(p) == ".json" {
+			if !d.IsDir() && path.Ext(p) == ".json" {
 				jsonFiles = append(jsonFiles, p)
 			}
 			return nil
@@ -45,16 +47,16 @@ func Setup() error {
 			continue
 		}
 
-		if _, ok := Providers[p.Id]; ok {
+		if _, ok := Providers[p.ID]; ok {
 			slog.Warn(
 				"skipping provider",
 				slog.String("reason", "duplicated"),
 				slog.String("file", f),
-				slog.String("id", p.Id),
+				slog.String("id", p.ID),
 			)
 			continue
 		} else {
-			Providers[p.Id] = p
+			Providers[p.ID] = p
 		}
 	}
 
@@ -90,7 +92,7 @@ func NewProvider(filePath string) (*Provider, error) {
 		} else {
 			slog.Warn(
 				"provider env is not configured",
-				slog.String("provider", provider.Id),
+				slog.String("provider", provider.ID),
 				slog.String("env", env),
 				slog.String("placeholder", placeholder),
 			)
