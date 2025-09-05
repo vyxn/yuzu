@@ -1,0 +1,69 @@
+{
+  "id": "comicvine",
+  "inputs": {
+    "series": "%series%",
+    "chapter": "%chapter%"
+  },
+  "envs": {
+    "COMICVINE_API_KEY": "%apiKey%"
+  },
+  "vars": {
+    "%baseUrl%": "http://comicvine.gamespot.com/api"
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "url": "%baseUrl%/volumes",
+      "params": {
+        "api_key": "%apiKey%",
+        "format": "json",
+        "filter": "name:%series%"
+      },
+      "responseType": "json",
+      "cache": true,
+      "result": {
+        "%detailUrl%": "$.results[1].api_detail_url"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "%detailUrl%",
+      "params": {
+        "api_key": "%apiKey%",
+        "format": "json"
+      },
+      "responseType": "json",
+      "cache": true,
+      "result": {
+        "%seriesName%": "$.results.name",
+        "%issueDetailUrl%": "$.results.issues[?(@.issue_number=='%chapter%')].api_detail_url"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "%issueDetailUrl%",
+      "params": {
+        "api_key": "%apiKey%",
+        "format": "json"
+      },
+      "responseType": "json",
+      "cache": true,
+      "result": {
+        "%issueTitle%": "$.results.name",
+        "%issueNumber%": "$.results.issue_number",
+        "%issueDescription%": "$.results.description"
+      }
+    }
+  ],
+  "output": {
+    "type": "xml",
+    "schema": "https://github.com/anansi-project/comicinfo/blob/main/drafts/v2.1/ComicInfo.xsd",
+    "content": {
+      "Series": "%seriesName%",
+      "Title": "%issueTitle%",
+      "Number": "%issueNumber%",
+      "Summary": "%issueDescription%"
+    }
+  }
+}
+

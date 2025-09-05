@@ -2,13 +2,18 @@ package internal
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 
+	"github.com/AsaiYusuke/jsonpath/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal/kitsu"
 	"github.com/vyxn/yuzu/internal/lib"
+
 	// "github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/provider"
@@ -39,6 +44,7 @@ func SetupRoutes(e *echo.Echo) {
 	e.GET("/mangaChapters", hMangaChapters)
 	e.GET("/comicinfo", hComicInfo)
 	e.GET("/lib", hLib)
+	e.POST("/jsonPath", hJsonPath)
 }
 
 // Handler
@@ -131,4 +137,30 @@ func hLib(c echo.Context) error {
 		panic(err)
 	}
 	return c.String(http.StatusOK, "all good")
+}
+
+func hJsonPath(c echo.Context) error {
+	p := c.QueryParam("path")
+	j, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return err
+	}
+
+	var jsonValue any
+	err = json.Unmarshal(j, &jsonValue)
+	if err != nil {
+		return yerr.WithStackf(
+			"unmarshalling: %w",
+			err,
+		)
+	}
+
+	slog.Warn("/jsonPath", slog.String("path", p), slog.Any("json", "m"))
+	out, err := jsonpath.Retrieve(p, jsonValue)
+	if err != nil {
+		println(err.Error())
+		return yerr.WithStackf("retrieving jsonpath: %s %w", out, err)
+	}
+
+	return c.JSON(http.StatusOK, out)
 }

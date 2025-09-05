@@ -81,7 +81,10 @@ func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
 		if err != nil {
 			return nil, yerr.WithStackf("parsing url <%s> -> <%s>: %w", e.Url, u, err)
 		}
-		slog.Info("formed url", slog.String("url", u.String()))
+		slog.Info("calling endpoint",
+			slog.String("url", u.String()),
+			slog.Any("runEnv", runEnv),
+		)
 
 		q := u.Query()
 		for k, v := range e.Params {
@@ -130,7 +133,7 @@ func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
 		}
 
 		for k, v := range e.Result {
-			out, err := jsonpath.Retrieve(v, result)
+			out, err := jsonpath.Retrieve(getFromRunEnv(runEnv, v), result)
 			if err != nil {
 				return nil, yerr.WithStackf("retrieving jsonpath: %w", err)
 			}

@@ -1,6 +1,6 @@
 # Provider TODOs
 
-- [ ] migrate comicvine to generic provider
+- [x] migrate comicvine to generic provider
 - [ ] migrate kitsu to generic provider
 - [ ] add xpath for xml only APIs
 - [ ] improve generic provider Run()

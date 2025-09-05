@@ -37,19 +37,19 @@
       ],
       "responseType": "json,xml",
       "result": {
-        "title": "$.title",
-        "synopsis": "$.synopsis"
+        "%title%": "$.title",
+        "%synopsis%": "$.synopsis"
       }
     }
   ],
   "output": {
-    "type": "json",
+    "type": "xml",
     "schema": "https://github.com/anansi-project/comicinfo/blob/main/drafts/v2.1/ComicInfo.xsd",
     "content": {
-      "series": "title",
-      "summary": "synopsis",
-      "notes": "%defaultNote%",
-      "manga": "YesAndRightToLeft"
+      "Series": "%title%",
+      "Summary": "%synopsis%",
+      "Notes": "%defaultNote%",
+      "Manga": "YesAndRightToLeft"
     }
   }
 }
