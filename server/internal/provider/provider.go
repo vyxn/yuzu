@@ -8,13 +8,14 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/AsaiYusuke/jsonpath/v2"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
+
+	"github.com/AsaiYusuke/jsonpath/v2"
 )
 
 type Provider interface {
@@ -73,7 +74,41 @@ type Output struct {
 	Content map[string]string `json:"content"`
 }
 
-var Providers = sync.Map{}
+func NewProvider(filePath string) (*HTTPProvider, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, yerr.WithStackf("opening provider file: %v", err)
+	}
+
+	defer file.Close()
+
+	bytes, err := io.ReadAll(file)
+	if err != nil {
+		return nil, yerr.WithStackf("reading provider file: %v", err)
+	}
+
+	var provider HTTPProvider
+	if err := json.Unmarshal(bytes, &provider); err != nil {
+		return nil, yerr.WithStackf("unmarshaling provider JSON: %v", err)
+	}
+
+	m := make(map[string]string)
+	for env, placeholder := range provider.Envs {
+		if v, ok := os.LookupEnv(env); ok {
+			m[placeholder] = v
+		} else {
+			slog.Warn(
+				"provider env is not configured",
+				slog.String("provider", provider.ID),
+				slog.String("env", env),
+				slog.String("placeholder", placeholder),
+			)
+		}
+	}
+	provider.Envs = m
+
+	return &provider, nil
+}
 
 func (p *HTTPProvider) MimeType() string {
 	switch p.Output.Type {

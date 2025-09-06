@@ -1,10 +1,10 @@
 package config
 
 import (
+	"context"
 	"io/fs"
 	"log/slog"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -47,51 +47,76 @@ func Info() {
 	)
 }
 
+func LoadProvider(path string) {
+	info, err := os.Stat(path)
+	if err != nil {
+		slog.Warn("could not get path info", slog.String("path", path))
+		return
+	}
+
+	if info.IsDir() || !slices.Contains(allowedExtensions, filepath.Ext(path)) {
+		return
+	}
+
+	prov, err := NewProvider(path)
+	if err != nil {
+		slog.Warn(
+			"skipping provider",
+			slog.String("reason", "error"),
+			slog.String("path", path),
+			slog.Any("error", err),
+		)
+		return
+	}
+
+	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	if id == "" || id == string(filepath.Separator) {
+		return
+	}
+
+	// if _, ok := Cfg.Providers.Load(id); ok {
+	// 	slog.Warn(
+	// 		"skipping provider",
+	// 		slog.String("reason", "duplicated"),
+	// 		slog.String("path", path),
+	// 		slog.String("id", id),
+	// 	)
+	// 	return nil
+	// }
+
+	Cfg.Providers.Store(id, prov)
+	providerPaths.Store(path, id)
+}
+
+func UnloadProvider(path string) {
+	if id, ok := providerPaths.LoadAndDelete(path); ok {
+		Cfg.Providers.Delete(id)
+		slog.Info("deleted provider", slog.String("provider", id.(string)))
+	}
+}
+
 func Load() error {
 	return Cfg.GetFiles(
 		dirProviders,
 		func(p string, d fs.DirEntry, err error) error {
-			// if err != nil && p == basePath {
-			// 	return yerr.WithStackf("reading providers dir: %w", err)
-			// } else
 			if err != nil {
 				slog.Warn("walking providers dir", slog.Any("err", err))
 				return nil
 			}
 
-			if d.IsDir() || !slices.Contains(allowedExtensions, path.Ext(p)) {
-				return nil
-			}
-
-			prov, err := NewProvider(p)
-			if err != nil {
-				slog.Warn(
-					"skipping provider",
-					slog.String("reason", "error"),
-					slog.String("file", p),
-					slog.Any("error", err),
-				)
-				return nil
-			}
-
-			id := strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))
-			if id == "" || id == string(filepath.Separator) {
-				return nil
-			}
-
-			if _, ok := Cfg.Providers.Load(id); ok {
-				slog.Warn(
-					"skipping provider",
-					slog.String("reason", "duplicated"),
-					slog.String("file", p),
-					slog.String("id", id),
-				)
-				return nil
-			}
-
-			Cfg.Providers.Store(id, prov)
-			providerPaths.Store(p, id)
+			LoadProvider(p)
 			return nil
 		},
 	)
+}
+
+func WatchProviders(ctx context.Context) {
+	for _, dir := range Cfg.Paths {
+		if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+			continue
+		}
+
+		d := filepath.Join(dir, dirProviders)
+		go Watch(ctx, d, LoadProvider, UnloadProvider)
+	}
 }

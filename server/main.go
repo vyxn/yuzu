@@ -8,12 +8,12 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"syscall"
 	"time"
 
 	"github.com/vyxn/yuzu/internal"
 	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/pkg/log"
-	"github.com/vyxn/yuzu/internal/provider"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -44,10 +44,15 @@ func main() {
 	if err := config.Load(); err != nil {
 		panic(err)
 	}
+	config.WatchProviders(ctx)
+	// go provider.Watch(
+	// 	ctx,
+	// 	"config/providers",
+	// 	config.LoadProvider,
+	// 	config.UnloadProvider,
+	// )
 
 	config.Info()
-
-	go provider.Watch(ctx, "config/providers")
 
 	db := internal.GetDB()
 	if err := db.Ping(); err != nil {
@@ -74,11 +79,17 @@ func main() {
 	}()
 
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
-	<-quit
+	defer close(quit)
 
-	ctx, cancel = context.WithTimeout(ctx, 10*time.Second)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(quit)
+
+	s := <-quit
+	slog.Info("stopping server...", slog.String("signal", s.String()))
+
+	ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
+
 	if err := e.Shutdown(ctx); err != nil {
 		slog.Error("error stopping the server", slog.Any("error", err))
 		os.Exit(1)
