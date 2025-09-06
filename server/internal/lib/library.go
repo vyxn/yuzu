@@ -6,13 +6,14 @@ import (
 	"path"
 	"regexp"
 
+	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/provider"
 )
 
 var re = regexp.MustCompile(`(?i)^.*?(?:chapter|ch|c)?\s?(\d+).*\.cbz$`)
 
 func Process(dir string) error {
-	p, ok := provider.Providers.Load("kitsu")
+	p, ok := config.Cfg.Providers.Load("kitsu")
 	if !ok {
 		return fmt.Errorf("do better this error")
 	}
@@ -24,14 +25,18 @@ func Process(dir string) error {
 
 	for _, e := range entries {
 		if e.Type().IsDir() {
-			processSeries(p.(*provider.Provider), path.Join(dir, e.Name()), e.Name())
+			processSeries(
+				p.(*provider.HTTPProvider),
+				path.Join(dir, e.Name()),
+				e.Name(),
+			)
 		}
 	}
 
 	return nil
 }
 
-func processSeries(p *provider.Provider, dir, series string) error {
+func processSeries(p *provider.HTTPProvider, dir, series string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -47,7 +52,7 @@ func processSeries(p *provider.Provider, dir, series string) error {
 }
 
 func processChapter(
-	p *provider.Provider,
+	p *provider.HTTPProvider,
 	dir, series, chapter string,
 ) error {
 	if path.Ext(chapter) != ".cbz" {

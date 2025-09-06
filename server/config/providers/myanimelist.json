@@ -1,5 +1,5 @@
 {
-  "id": "myanimelist",
+  "type": "http",
   "envs": {
     "MYANIMELIST_CLIENT_ID": "%clientId%"
   },
@@ -14,7 +14,7 @@
     "X-MAL-CLIENT-ID": "%clientId%"
   },
   "endpoints": [
-   {
+    {
       "method": "GET",
       "url": "%baseUrl%",
       "params": {
@@ -53,4 +53,3 @@
     }
   }
 }
-

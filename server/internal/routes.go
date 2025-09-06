@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/lib"
 	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
@@ -49,8 +50,8 @@ func hComicInfo(c echo.Context) error {
 	chapter := c.QueryParam("c")
 	prov := c.Param("id")
 
-	if p, ok := provider.Providers.Load(prov); ok {
-		p, ok := p.(*provider.Provider)
+	if p, ok := config.Cfg.Providers.Load(prov); ok {
+		p, ok := p.(*provider.HTTPProvider)
 		assert.Assert(ok, "found unexpected type in providers map")
 
 		data, err := p.Run(map[string]string{
@@ -102,7 +103,7 @@ func hJsonPath(c echo.Context) error {
 func hProvider(c echo.Context) error {
 	id := c.Param("id")
 
-	if p, ok := provider.Providers.Load(id); ok {
+	if p, ok := config.Cfg.Providers.Load(id); ok {
 		return c.JSON(http.StatusOK, p)
 	}
 

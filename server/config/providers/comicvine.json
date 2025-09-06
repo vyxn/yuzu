@@ -1,5 +1,5 @@
 {
-  "id": "comicvine",
+  "type": "http",
   "inputs": {
     "series": "%series%",
     "chapter": "%chapter%"
@@ -66,4 +66,3 @@
     }
   }
 }
-

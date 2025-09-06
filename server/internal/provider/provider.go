@@ -17,7 +17,35 @@ import (
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 )
 
-type Provider struct {
+type Provider interface {
+	Run(map[string]string) ([]byte, error)
+}
+
+type RawProvider struct {
+	Type string `json:"type"`
+	Raw  json.RawMessage
+}
+
+func New(path string, r io.Reader) (Provider, error) {
+	var p RawProvider
+	d := json.NewDecoder(r)
+	if err := d.Decode(&p); err != nil {
+		return nil, yerr.WithStackf("unmarshaling provider JSON: %v", err)
+	}
+
+	var prov Provider
+	var err error
+	switch p.Type {
+	case "http":
+		prov, err = NewProvider(path)
+	case "cli":
+	default:
+		slog.Warn("provider type not supported", slog.String("type", p.Type))
+	}
+	return prov, err
+}
+
+type HTTPProvider struct {
 	ID        string            `json:"id"`
 	Inputs    map[string]string `json:"inputs"`
 	Envs      map[string]string `json:"envs,omitempty"`
@@ -30,7 +58,7 @@ type Provider struct {
 
 type Endpoint struct {
 	Method       string            `json:"method"`
-	Url          string            `json:"url"`
+	URL          string            `json:"url"`
 	Params       map[string]string `json:"params,omitempty"`
 	Headers      map[string]string `json:"headers"`
 	Body         []string          `json:"body,omitempty"`
@@ -47,7 +75,7 @@ type Output struct {
 
 var Providers = sync.Map{}
 
-func (p *Provider) MimeType() string {
+func (p *HTTPProvider) MimeType() string {
 	switch p.Output.Type {
 	case "json":
 		return "application/json"
@@ -58,7 +86,7 @@ func (p *Provider) MimeType() string {
 	}
 }
 
-func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
+func (p *HTTPProvider) Run(inputs map[string]string) ([]byte, error) {
 	// Merging os.env and inputs for this run environment values
 	runEnv := make(map[string]string)
 	maps.Copy(runEnv, p.Envs)
@@ -72,9 +100,9 @@ func (p *Provider) Run(inputs map[string]string) ([]byte, error) {
 	ctx := context.Background()
 	client := &http.Client{Timeout: 10 * time.Second}
 	for _, e := range p.Endpoints {
-		u, err := url.Parse(getFromRunEnv(runEnv, e.Url))
+		u, err := url.Parse(getFromRunEnv(runEnv, e.URL))
 		if err != nil {
-			return nil, yerr.WithStackf("parsing url <%s> -> <%s>: %w", e.Url, u, err)
+			return nil, yerr.WithStackf("parsing url <%s> -> <%s>: %w", e.URL, u, err)
 		}
 		slog.Info("calling endpoint",
 			slog.String("url", u.String()),

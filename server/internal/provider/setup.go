@@ -183,7 +183,7 @@ func Setup() error {
 	return nil
 }
 
-func NewProvider(filePath string) (*Provider, error) {
+func NewProvider(filePath string) (*HTTPProvider, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, yerr.WithStackf("opening provider file: %v", err)
@@ -196,7 +196,7 @@ func NewProvider(filePath string) (*Provider, error) {
 		return nil, yerr.WithStackf("reading provider file: %v", err)
 	}
 
-	var provider Provider
+	var provider HTTPProvider
 	if err := json.Unmarshal(bytes, &provider); err != nil {
 		return nil, yerr.WithStackf("unmarshaling provider JSON: %v", err)
 	}

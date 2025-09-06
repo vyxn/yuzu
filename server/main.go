@@ -10,11 +10,13 @@ import (
 	"slices"
 	"time"
 
-	"github.com/joho/godotenv"
-	"github.com/labstack/echo/v4"
 	"github.com/vyxn/yuzu/internal"
+	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/pkg/log"
 	"github.com/vyxn/yuzu/internal/provider"
+
+	"github.com/joho/godotenv"
+	"github.com/labstack/echo/v4"
 )
 
 var env = os.Getenv("APP_ENV")
@@ -39,16 +41,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	err := provider.Setup()
-	if err != nil {
+	if err := config.Load(); err != nil {
 		panic(err)
 	}
+
+	config.Info()
 
 	go provider.Watch(ctx, "config/providers")
 
 	db := internal.GetDB()
-	err = db.Ping()
-	if err != nil {
+	if err := db.Ping(); err != nil {
 		panic(err)
 	}
 
