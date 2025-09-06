@@ -19,12 +19,27 @@ import (
 )
 
 type Provider interface {
+	ProviderID() string
+	Store(io.Writer) error
 	Run(map[string]string) ([]byte, error)
 }
 
 type RawProvider struct {
 	Type string `json:"type"`
 	Raw  json.RawMessage
+}
+
+func (p *RawProvider) UnmarshalJSON(data []byte) error {
+	p.Raw = append(p.Raw[:0], data...)
+
+	type Alias RawProvider
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(p),
+	}
+
+	return json.Unmarshal(data, &aux)
 }
 
 func New(path string, r io.Reader) (Provider, error) {
@@ -47,7 +62,8 @@ func New(path string, r io.Reader) (Provider, error) {
 }
 
 type HTTPProvider struct {
-	ID        string            `json:"id"`
+	ID        string            `json:"-"` // filename
+	Type      string            `json:"type"`
 	Inputs    map[string]string `json:"inputs"`
 	Envs      map[string]string `json:"envs,omitempty"`
 	Vars      map[string]string `json:"vars,omitempty"`
@@ -108,6 +124,15 @@ func NewProvider(filePath string) (*HTTPProvider, error) {
 	provider.Envs = m
 
 	return &provider, nil
+}
+
+func (p *HTTPProvider) ProviderID() string {
+	return p.ID
+}
+
+func (p *HTTPProvider) Store(w io.Writer) error {
+	e := json.NewEncoder(w)
+	return e.Encode(p)
 }
 
 func (p *HTTPProvider) MimeType() string {

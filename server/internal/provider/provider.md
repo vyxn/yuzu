@@ -6,8 +6,8 @@
 - [ ] improve generic provider Run()
 - [x] optimize provider setup
 - [x] check provider config autoreloading
-- [ ] .config/meta-yuzu/providers/*.json discover all jsons in there
-  - [ ] on setup create folder structure + copy the ones in project for the time being
+- [x] .config/meta-yuzu/providers/*.json discover all jsons in there
+  - [x] on setup create folder structure + copy the ones in project for the time being
 - [x] xml response support
 - [x] include json path library to access results
 - [x] return compiled output value

@@ -4,9 +4,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/lib"
@@ -29,7 +30,8 @@ func SetupRoutes(e *echo.Echo) {
 	e.GET("/", hello)
 	e.GET("/lib", hLib)
 	e.GET("/providers/:id", hProvider)
-	e.GET("/providers/:id/run", hComicInfo)
+	e.PUT("/providers/:id", hProviderPut)
+	e.GET("/providers/:id/run", hProviderRun)
 
 	// Debug
 	e.POST("/jsonPath", hJsonPath)
@@ -45,25 +47,33 @@ func hello(c echo.Context) error {
 	return c.String(http.StatusOK, "Hello, World!")
 }
 
-func hComicInfo(c echo.Context) error {
-	series := c.QueryParam("s")
-	chapter := c.QueryParam("c")
-	prov := c.Param("id")
-
-	if p, ok := config.Cfg.Providers.Load(prov); ok {
-		p, ok := p.(*provider.HTTPProvider)
-		assert.Assert(ok, "found unexpected type in providers map")
-
-		data, err := p.Run(map[string]string{
-			"series":  series,
-			"chapter": chapter,
-		})
-		if err != nil {
-			return echo.ErrBadRequest.SetInternal(err)
-		}
-		return c.Blob(http.StatusOK, p.MimeType(), data)
+func queryToMap(queryParams url.Values, sep string) map[string]string {
+	m := make(map[string]string)
+	for k, v := range queryParams {
+		m[k] = strings.Join(v, sep)
 	}
-	return nil
+	return m
+}
+
+func hProviderRun(c echo.Context) error {
+	id := c.Param("id")
+	input := queryToMap(c.QueryParams(), ",")
+
+	pr, ok := config.Cfg.Providers.Load(id)
+	if !ok {
+		return echo.NewHTTPError(http.StatusNotFound, "provider not found")
+	}
+
+	p, ok := pr.(*provider.HTTPProvider)
+	assert.Assert(ok, "found unexpected type in providers map")
+
+	data, err := p.Run(input)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "error while running provider").
+			SetInternal(err)
+	}
+
+	return c.Blob(http.StatusOK, p.MimeType(), data)
 }
 
 func hLib(c echo.Context) error {
@@ -76,25 +86,18 @@ func hLib(c echo.Context) error {
 
 func hJsonPath(c echo.Context) error {
 	p := c.QueryParam("path")
-	j, err := io.ReadAll(c.Request().Body)
-	if err != nil {
-		return err
-	}
 
 	var jsonValue any
-	err = json.Unmarshal(j, &jsonValue)
-	if err != nil {
-		return yerr.WithStackf(
-			"unmarshalling: %w",
-			err,
-		)
+	if err := c.Bind(&jsonValue); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "parsing body").
+			SetInternal(yerr.WithStackf("unmarshalling body: %w", err))
 	}
 
 	slog.Warn("/jsonPath", slog.String("path", p), slog.Any("json", "m"))
 	out, err := jsonpath.Retrieve(p, jsonValue)
 	if err != nil {
-		println(err.Error())
-		return yerr.WithStackf("retrieving jsonpath: %s %w", out, err)
+		return echo.NewHTTPError(http.StatusBadRequest, "retrieving jsonpath").
+			SetInternal(yerr.WithStackf("retrieving jsonpath: %s %w", out, err))
 	}
 
 	return c.JSON(http.StatusOK, out)
@@ -108,4 +111,31 @@ func hProvider(c echo.Context) error {
 	}
 
 	return echo.ErrNotFound
+}
+
+func hProviderPut(c echo.Context) error {
+	id := c.Param("id")
+	p := provider.RawProvider{}
+
+	// Bind request body to struct
+	if err := c.Bind(&p); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "parsing body content").
+			SetInternal(yerr.WithStackf("unmarshaling provider JSON: %v", err))
+	}
+
+	switch p.Type {
+	case "http":
+		hp := provider.HTTPProvider{}
+		if err := json.Unmarshal(p.Raw, &hp); err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "parsing body content of type http").
+				SetInternal(yerr.WithStackf("unmarshaling provider JSON: %v", err))
+		}
+		hp.ID = id
+		config.StoreProvider(id, &hp)
+		return c.JSON(http.StatusOK, hp)
+	case "cli":
+		return c.JSON(http.StatusOK, p)
+	default:
+		return yerr.WithStackf("type %s is not supported", p.Type)
+	}
 }

@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -93,6 +94,15 @@ func UnloadProvider(path string) {
 		Cfg.Providers.Delete(id)
 		slog.Info("deleted provider", slog.String("provider", id.(string)))
 	}
+}
+
+func StoreProvider(id string, p provider.Provider) error {
+	subpath := filepath.Join(dirProviders, id+".json")
+
+	pr, pw := io.Pipe()
+
+	go Cfg.StoreFile(subpath, pr)
+	return p.Store(pw)
 }
 
 func Load() error {

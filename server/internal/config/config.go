@@ -3,6 +3,7 @@ package config
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -64,18 +65,34 @@ func (cfg *Config) GetFile(subpath string) (string, error) {
 	return "", yerr.WithStackf("no config file \"%s\" found", subpath)
 }
 
-// func (cfg *Config) EnsureFile(subpath string) (string, error) {
-// 	for _, d := range cfg.Paths {
-// 		dir := filepath.Join(d, filepath.Dir(subpath))
-// 		if fi, err := os.Stat(dir); err != nil {
-// 			err := os.MkdirAll(dir, 0700)
-// 			if err != nil {
-//
-// 			}
-// 		}
-// 		break
-// 	}
-// }
+func (cfg *Config) StoreFile(subpath string, r io.Reader) (ferr error) {
+	for _, d := range cfg.Paths {
+		path := filepath.Join(d, subpath)
+		err := os.MkdirAll(filepath.Dir(path), 0700)
+		if err != nil {
+			return yerr.WithStackf("couldn't create required dir \"%s\": %w", d, err)
+		}
+
+		f, err := os.Create(path)
+		if err != nil {
+			return yerr.WithStackf("couldn't create file \"%s\": %w", path, err)
+		}
+		defer func() {
+			if err := f.Close(); err != nil {
+				ferr = errors.Join(
+					ferr,
+					yerr.WithStackf("couldn't close file \"%s\": %w", path, err),
+				)
+			}
+		}()
+
+		if _, err = io.Copy(f, r); err != nil {
+			return yerr.WithStackf("couldn't write to file \"%s\": %w", path, err)
+		}
+		break
+	}
+	return nil
+}
 
 func configPaths(isDev bool) []string {
 	paths := []string{}
