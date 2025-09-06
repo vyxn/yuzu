@@ -1,12 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/pkg/assert"
-	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/provider"
 
 	"github.com/labstack/echo/v4"
@@ -30,29 +28,15 @@ func getProvider(c echo.Context) error {
 
 func putProvider(c echo.Context) error {
 	id := c.Param("id")
-	p := provider.RawProvider{}
 
-	// Bind request body to struct
-	if err := c.Bind(&p); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "parsing body content").
-			SetInternal(yerr.WithStackf("unmarshaling provider JSON: %v", err))
+	p, err := provider.New(id, c.Request().Body)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "parsing provider").
+			SetInternal(err)
 	}
 
-	switch p.Type {
-	case "http":
-		hp := provider.HTTPProvider{}
-		if err := json.Unmarshal(p.Raw, &hp); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "parsing body content of type http").
-				SetInternal(yerr.WithStackf("unmarshaling provider JSON: %v", err))
-		}
-		hp.ID = id
-		config.StoreProvider(id, &hp)
-		return c.JSON(http.StatusOK, hp)
-	case "cli":
-		return c.JSON(http.StatusOK, p)
-	default:
-		return yerr.WithStackf("type %s is not supported", p.Type)
-	}
+	config.StoreProvider(id, p)
+	return c.JSON(http.StatusOK, p)
 }
 
 func getProviderRun(c echo.Context) error {
