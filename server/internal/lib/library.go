@@ -1,3 +1,4 @@
+// Package lib contains all functionality to manage the libraries
 package lib
 
 import (

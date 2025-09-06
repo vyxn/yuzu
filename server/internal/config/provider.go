@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -20,14 +21,14 @@ const dirProviders = "providers"
 var providerPaths = sync.Map{}
 var allowedExtensions = []string{".json", ".jsonc"}
 
-func NewProvider(filepath string) (provider.Provider, error) {
+func NewProvider(filepath string) (p provider.Provider, ferr error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, yerr.WithStackf("opening provider file: %v", err)
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			// TODO
+			ferr = errors.Join(ferr, yerr.WithStackf("closing file: %w", err))
 		}
 	}()
 

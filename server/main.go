@@ -13,6 +13,7 @@ import (
 
 	"github.com/vyxn/yuzu/internal"
 	"github.com/vyxn/yuzu/internal/config"
+	"github.com/vyxn/yuzu/internal/handler"
 	"github.com/vyxn/yuzu/internal/pkg/log"
 
 	"github.com/joho/godotenv"
@@ -22,8 +23,11 @@ import (
 var env = os.Getenv("APP_ENV")
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt, syscall.SIGTERM,
+	)
+	defer stop()
 
 	logger := log.NewLogger()
 	slog.SetDefault(logger)
@@ -45,13 +49,6 @@ func main() {
 		panic(err)
 	}
 	config.WatchProviders(ctx)
-	// go provider.Watch(
-	// 	ctx,
-	// 	"config/providers",
-	// 	config.LoadProvider,
-	// 	config.UnloadProvider,
-	// )
-
 	config.Info()
 
 	db := internal.GetDB()
@@ -66,7 +63,7 @@ func main() {
 
 	internal.SetupMiddleware(e)
 	internal.SetupErrorHandling(e)
-	internal.SetupRoutes(e)
+	handler.SetupRoutes(e)
 
 	port := ":8080"
 	logger.Info("http server started", slog.String("port", port))
@@ -78,16 +75,10 @@ func main() {
 		}
 	}()
 
-	quit := make(chan os.Signal, 1)
-	defer close(quit)
+	<-ctx.Done()
+	slog.Info("stopping server...")
 
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(quit)
-
-	s := <-quit
-	slog.Info("stopping server...", slog.String("signal", s.String()))
-
-	ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 
 	if err := e.Shutdown(ctx); err != nil {
