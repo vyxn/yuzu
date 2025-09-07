@@ -15,7 +15,7 @@
 - [x] handle comicinfo schema validation
 - [ ] add xpath for xml only APIs
 - [ ] improve generic provider Run()
-- [ ] validate expected provider json with a schema, created from our structs
+- [x] validate expected provider json with a schema, created from our structs
 - [x] add support for yaml output
 - [x] add support for md frontmatter output
 - [x] handle querying all providers

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/kaptinlin/jsonschema"
 	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/provider"
@@ -16,6 +17,7 @@ func registerProvider(e *echo.Echo) {
 	e.GET("/providers/:id", getProvider)
 	e.PUT("/providers/:id", putProvider)
 	e.GET("/providers/:id/run", getProviderRun)
+	e.GET("/schemas/providers/http", getProviderSchema)
 }
 
 func getProviders(c echo.Context) error {
@@ -71,4 +73,9 @@ func getProviderRun(c echo.Context) error {
 	}
 
 	return c.Blob(http.StatusOK, p.MimeType(), data)
+}
+
+func getProviderSchema(c echo.Context) error {
+	schema := jsonschema.FromStruct[provider.HTTPProvider]()
+	return c.JSON(http.StatusOK, schema)
 }

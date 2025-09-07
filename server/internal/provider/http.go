@@ -25,37 +25,53 @@ import (
 )
 
 type HTTPProvider struct {
-	ID        string            `json:"-"` // filename
-	Type      string            `json:"type"`
-	Inputs    map[string]string `json:"inputs"`
-	Envs      map[string]string `json:"envs,omitempty"`
-	Vars      map[string]string `json:"vars,omitempty"`
-	Headers   map[string]string `json:"headers,omitempty"`
-	Endpoints []Endpoint        `json:"endpoints"`
-	Output    Output            `json:"output"`
+	ID        string            `json:"-"                 jsonschema:"-"`
+	Type      string            `json:"type"              jsonschema:"required,enum=http"`
+	Inputs    map[string]string `json:"inputs"            jsonschema:"required,minProperties=1"`
+	Envs      map[string]string `json:"envs,omitempty"    jsonschema:""`
+	Vars      map[string]string `json:"vars,omitempty"    jsonschema:""`
+	Headers   map[string]string `json:"headers,omitempty" jsonschema:""`
+	Endpoints []Endpoint        `json:"endpoints"         jsonschema:"required"`
+	Output    Output            `json:"output"            jsonschema:"required"`
 }
 
 type Endpoint struct {
-	Method       string            `json:"method"`
-	URL          string            `json:"url"`
-	Params       map[string]string `json:"params,omitempty"`
-	Headers      map[string]string `json:"headers"`
-	Body         []string          `json:"body,omitempty"`
-	Cache        bool              `json:"cache,omitempty"`
-	ResponseType string            `json:"responseType,omitempty"`
-	Result       map[string]string `json:"result,omitempty"`
+	Method       string            `json:"method"                 jsonschema:"required,enum=GET,POST,PUT,PATCH,DELETE"`
+	URL          string            `json:"url"                    jsonschema:"required,format=uri"`
+	Params       map[string]string `json:"params,omitempty"       jsonschema:""`
+	Headers      map[string]string `json:"headers,omitempty"      jsonschema:""`
+	Body         []string          `json:"body,omitempty"         jsonschema:""`
+	Cache        bool              `json:"cache,omitempty"        jsonschema:""`
+	ResponseType string            `json:"responseType,omitempty" jsonschema:"enum=json,xml,text,binary"`
+	Result       map[string]string `json:"result,omitempty"       jsonschema:""`
 }
 
 type Output struct {
-	Type   string `json:"type"`
-	Schema string `json:"schema"`
-	// If sorting becomes relevant: https://github.com/wk8/go-ordered-map
-	Content    map[string]any     `json:"content"`
-	JSONSchema *jsonschema.Schema `json:"-"`
-	XMLSchema  *xmlparser.Schema  `json:"-"`
+	Type       string             `json:"type"    jsonschema:"required,enum=json,md,xml,yaml"`
+	Schema     string             `json:"schema"  jsonschema:""`
+	Content    map[string]any     `json:"content" jsonschema:"required"`
+	JSONSchema *jsonschema.Schema `json:"-"       jsonschema:"-"`
+	XMLSchema  *xmlparser.Schema  `json:"-"       jsonschema:"-"`
 }
 
 func newHTTPProvider(id string, rp *RawProvider) (*HTTPProvider, error) {
+	schema := jsonschema.FromStruct[HTTPProvider]()
+	res := schema.ValidateJSON(rp.Raw)
+
+	if !res.IsValid() {
+		errs := ""
+		for path, message := range res.GetDetailedErrors() {
+			errs += fmt.Sprintf("\n- %s: %s", path, message)
+			slog.Info(
+				"validation result",
+				slog.String("path", path),
+				slog.String("message", message),
+			)
+
+		}
+		return nil, yerr.WithStackf("validating provider json schema: %s", errs)
+	}
+
 	var provider HTTPProvider
 	if err := json.Unmarshal(rp.Raw, &provider); err != nil {
 		return nil, yerr.WithStackf("unmarshaling provider JSON: %v", err)
