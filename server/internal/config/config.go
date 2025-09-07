@@ -22,6 +22,7 @@ var Cfg *Config
 type Config struct {
 	IsDev     bool
 	Paths     []string
+	Libraries sync.Map
 	Providers sync.Map
 }
 

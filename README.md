@@ -31,3 +31,8 @@
 - [ ] allow create and update a library
 - [ ] add run job now
 - [ ] optimize number of provider runs with gorutines
+
+### Additional Providers
+- [ ] books: goodreads
+- [ ] books: hardcover
+

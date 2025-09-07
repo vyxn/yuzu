@@ -1,0 +1,1 @@
+{"type":"http","inputs":{"some":"value"},"endpoints":[{"method":"GET","url":"/some/path","headers":null}],"output":{"type":"json","schema":"","content":null},"schema":""}

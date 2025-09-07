@@ -1,0 +1,38 @@
+{
+  "path": "testlib",
+  "selectors": [
+    {
+      "type": "dir",
+      "regex": ".*/([^/]+)/?$",
+      "captures": {
+        "%series%": 1
+      }
+    },
+    {
+      "type": "file",
+      "regex": "(?i)^.*?(?:chapter|ch|c)?\\s?(\\d+).*\\.cbz$",
+      "captures": {
+        "%chapter%": 1
+      }
+    }
+  ],
+  "jobs": [
+    {
+      "schedule": "* 0 * * *",
+      "providers": [
+        {
+          "id": "myanimelist",
+          "inputs": {
+            "series": "%series%",
+            "chapter": "%chapter%"
+          }
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "providers": {
+      "merge": true
+    }
+  }
+}

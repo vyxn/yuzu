@@ -35,6 +35,11 @@ func NewProvider(filepath string) (p provider.Provider, ferr error) {
 }
 
 func Info() {
+	ls := []string{}
+	Cfg.Libraries.Range(func(key, value any) bool {
+		ls = append(ls, key.(string))
+		return true
+	})
 	ps := []string{}
 	Cfg.Providers.Range(func(key, value any) bool {
 		ps = append(ps, key.(string))
@@ -44,6 +49,7 @@ func Info() {
 		"config",
 		slog.Bool("dev", Cfg.IsDev),
 		slog.Any("directories", Cfg.Paths),
+		slog.Any("libraries", ls),
 		slog.Any("providers", ps),
 	)
 }

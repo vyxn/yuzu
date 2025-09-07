@@ -37,7 +37,7 @@ func New(path string, r io.Reader) (Provider, error) {
 	var p RawProvider
 	d := json.NewDecoder(r)
 	if err := d.Decode(&p); err != nil {
-		return nil, yerr.WithStackf("unmarshaling provider JSON: %v", err)
+		return nil, yerr.WithStackf("unmarshaling provider JSON: %w", err)
 	}
 
 	var prov Provider

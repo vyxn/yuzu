@@ -45,6 +45,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := config.LoadLibraries(); err != nil {
+		panic(err)
+	}
 	if err := config.Load(); err != nil {
 		panic(err)
 	}
