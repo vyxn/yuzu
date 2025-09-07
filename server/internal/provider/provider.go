@@ -10,6 +10,7 @@ import (
 
 type Provider interface {
 	ProviderID() string
+	GetPath() string
 	Store(io.Writer) error
 	Run(map[string]string) ([]byte, error)
 }
@@ -32,7 +33,7 @@ func (p *RawProvider) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &aux)
 }
 
-func New(id string, r io.Reader) (Provider, error) {
+func New(path string, r io.Reader) (Provider, error) {
 	var p RawProvider
 	d := json.NewDecoder(r)
 	if err := d.Decode(&p); err != nil {
@@ -43,11 +44,11 @@ func New(id string, r io.Reader) (Provider, error) {
 	var err error
 	switch p.Type {
 	case "http":
-		prov, err = newHTTPProvider(id, &p)
+		prov, err = newHTTPProvider(path, &p)
 		if err != nil {
 			slog.Warn(
 				"provider not loaded",
-				slog.String("provider", id),
+				slog.String("provider", path),
 				slog.Any("reason", err.Error()),
 			)
 		}

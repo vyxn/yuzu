@@ -19,7 +19,7 @@
 - [x] add support for yaml output
 - [x] add support for md frontmatter output
 - [x] handle querying all providers
-- [ ] allow to delete a provider
+- [x] allow to delete a provider
 
 ### Library
 - [ ] make basic structure of a library

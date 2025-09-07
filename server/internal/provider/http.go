@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ import (
 
 type HTTPProvider struct {
 	ID        string            `json:"-"                 jsonschema:"-"`
+	Path      string            `json:"-"                 jsonschema:"-"`
 	Type      string            `json:"type"              jsonschema:"required,enum=http"`
 	Inputs    map[string]string `json:"inputs"            jsonschema:"required,minProperties=1"`
 	Envs      map[string]string `json:"envs,omitempty"    jsonschema:""`
@@ -54,7 +56,7 @@ type Output struct {
 	XMLSchema  *xmlparser.Schema  `json:"-"       jsonschema:"-"`
 }
 
-func newHTTPProvider(id string, rp *RawProvider) (*HTTPProvider, error) {
+func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 	schema := jsonschema.FromStruct[HTTPProvider]()
 	res := schema.ValidateJSON(rp.Raw)
 
@@ -76,7 +78,9 @@ func newHTTPProvider(id string, rp *RawProvider) (*HTTPProvider, error) {
 	if err := json.Unmarshal(rp.Raw, &provider); err != nil {
 		return nil, yerr.WithStackf("unmarshaling provider JSON: %v", err)
 	}
-	provider.ID = id
+
+	provider.ID = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	provider.Path = path
 
 	envs := make(map[string]string)
 	for env, placeholder := range provider.Envs {
@@ -123,6 +127,10 @@ func newHTTPProvider(id string, rp *RawProvider) (*HTTPProvider, error) {
 
 func (p *HTTPProvider) ProviderID() string {
 	return p.ID
+}
+
+func (p *HTTPProvider) GetPath() string {
+	return p.Path
 }
 
 func (p *HTTPProvider) Store(w io.Writer) error {

@@ -16,6 +16,7 @@ func registerProvider(e *echo.Echo) {
 	e.GET("/providers", getProviders)
 	e.GET("/providers/:id", getProvider)
 	e.PUT("/providers/:id", putProvider)
+	e.DELETE("/providers/:id", deleteProvider)
 	e.GET("/providers/:id/run", getProviderRun)
 	e.GET("/schemas/providers/http", getProviderSchema)
 }
@@ -52,6 +53,19 @@ func putProvider(c echo.Context) error {
 
 	config.StoreProvider(id, p)
 	return c.JSON(http.StatusOK, p)
+}
+
+func deleteProvider(c echo.Context) error {
+	id := c.Param("id")
+
+	err := config.DeleteProvider(id)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "deleting provider").
+			SetInternal(err)
+	}
+
+	config.Info()
+	return c.NoContent(http.StatusNoContent)
 }
 
 func getProviderRun(c echo.Context) error {

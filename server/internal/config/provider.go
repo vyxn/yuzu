@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
@@ -71,8 +70,7 @@ func LoadProvider(path string) {
 		return
 	}
 
-	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	if id == "" || id == string(filepath.Separator) {
+	if prov.ProviderID() == "" || prov.ProviderID() == string(filepath.Separator) {
 		return
 	}
 
@@ -86,8 +84,8 @@ func LoadProvider(path string) {
 	// 	return nil
 	// }
 
-	Cfg.Providers.Store(id, prov)
-	providerPaths.Store(path, id)
+	Cfg.Providers.Store(prov.ProviderID(), prov)
+	providerPaths.Store(path, prov.ProviderID())
 }
 
 func UnloadProvider(path string) {
@@ -104,6 +102,28 @@ func StoreProvider(id string, p provider.Provider) error {
 
 	go Cfg.StoreFile(subpath, pr)
 	return p.Store(pw)
+}
+
+func DeleteProvider(id string) error {
+	p, ok := Cfg.Providers.Load(id)
+	if !ok {
+		return yerr.WithStackf("no provider with id '%s' found", id)
+	}
+
+	prov, ok := p.(provider.Provider)
+	if !ok {
+		return yerr.WithStackf("couldn't coerce provider with id '%s'", id)
+	}
+
+	if err := os.Remove(prov.GetPath()); err != nil {
+		return yerr.WithStackf("couldn't remove provider '%s': %w", id, err)
+	}
+
+	// Clear cached values
+	Cfg.Providers.Delete(id)
+	providerPaths.Delete(prov.GetPath())
+
+	return nil
 }
 
 func Load() error {
