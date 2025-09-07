@@ -9,7 +9,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
+	github.com/kaptinlin/jsonschema v0.4.12
 	github.com/labstack/echo/v4 v4.13.4
+	github.com/moolekkari/validatexml-go v0.1.0
 	github.com/syncthing/notify v0.0.0-20250528144937-c7027d4f7465
 )
 
@@ -29,11 +31,9 @@ require (
 	github.com/gotnospirit/makeplural v0.0.0-20180622080156-a5f48d94d976 // indirect
 	github.com/gotnospirit/messageformat v0.0.0-20221001023931-dfe49f1eb092 // indirect
 	github.com/kaptinlin/go-i18n v0.1.4 // indirect
-	github.com/kaptinlin/jsonschema v0.4.12 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/moolekkari/validatexml-go v0.1.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
