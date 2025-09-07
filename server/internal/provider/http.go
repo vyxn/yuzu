@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -83,7 +84,7 @@ func newHTTPProvider(id string, rp *RawProvider) (*HTTPProvider, error) {
 		}
 
 		switch provider.Output.Type {
-		case "json", "yaml":
+		case "json", "md", "yaml":
 			compiler := jsonschema.NewCompiler()
 			schema, err := compiler.Compile(rawSchema)
 			if err != nil {
@@ -117,6 +118,8 @@ func (p *HTTPProvider) MimeType() string {
 	switch p.Output.Type {
 	case "json":
 		return "application/json"
+	case "md":
+		return "application/md"
 	case "xml":
 		return "application/xml"
 	case "yaml":
@@ -226,17 +229,24 @@ func (p *HTTPProvider) Run(inputs map[string]string) ([]byte, error) {
 	return p.generateOutput(utils.SubstituteKeys(runEnv, p.Output.Content))
 }
 
-func (p *HTTPProvider) generateOutput(output any) ([]byte, error) {
-	var data []byte
+func (p *HTTPProvider) generateOutput(content any) ([]byte, error) {
+	var output []byte
 	var err error
+	var data []byte
+	var dataErr error
 
 	switch p.Output.Type {
 	case "json":
-		data, err = json.MarshalIndent(output, "", "  ")
+		output, err = json.MarshalIndent(content, "", "  ")
+	case "md":
+		output, err = yaml.MarshalWithOptions(content, yaml.Indent(2))
+		output = slices.Concat([]byte("---\n"), output, []byte("\n---\n"))
+		data, dataErr = json.Marshal(content)
 	case "xml":
-		data, err = MapToXML(output)
+		output, err = MapToXML(content)
 	case "yaml":
-		data, err = yaml.MarshalWithOptions(output, yaml.Indent(2))
+		output, err = yaml.MarshalWithOptions(content, yaml.Indent(2))
+		data, dataErr = json.Marshal(content)
 
 	default:
 		return nil, yerr.WithStackf("output type %s not supported", p.Output.Type)
@@ -246,11 +256,18 @@ func (p *HTTPProvider) generateOutput(output any) ([]byte, error) {
 		return nil, yerr.WithStackf("marshalling to %s: %w", p.Output.Type, err)
 	}
 
+	if dataErr != nil {
+		return nil, yerr.WithStackf("marshalling data to %s: %w", p.Output.Type, dataErr)
+	}
+
+	if data == nil {
+		data = output
+	}
 	if err := p.validateOutputSchema(data); err != nil {
 		return nil, err
 	}
 
-	return data, nil
+	return output, nil
 }
 
 func (p *HTTPProvider) validateOutputSchema(data []byte) error {
@@ -259,7 +276,7 @@ func (p *HTTPProvider) validateOutputSchema(data []byte) error {
 	}
 
 	switch p.Output.Type {
-	case "json":
+	case "json", "md", "yaml":
 		res := p.Output.JSONSchema.ValidateJSON(data)
 
 		if !res.IsValid() {

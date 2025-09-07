@@ -16,8 +16,8 @@
 - [ ] add xpath for xml only APIs
 - [ ] improve generic provider Run()
 - [ ] validate expected provider json with a schema, created from our structs
-- [ ] add support for yaml output
-- [ ] add support for md frontmatter output
+- [x] add support for yaml output
+- [x] add support for md frontmatter output
 - [x] handle querying all providers
 - [ ] allow to delete a provider
 
