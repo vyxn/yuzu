@@ -19,6 +19,7 @@
 - [ ] add support for yaml output
 - [ ] add support for md frontmatter output
 - [x] handle querying all providers
+- [ ] allow to delete a provider
 
 ### Library
 - [ ] make basic structure of a library
@@ -27,3 +28,4 @@
 - [ ] allow scheduling of jobs with crontab syntax
 - [ ] handle querying all libraries and a single library
 - [ ] allow create and update a library
+- [ ] add run job now
