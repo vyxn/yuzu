@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/pkg/assert"
@@ -11,9 +12,21 @@ import (
 )
 
 func registerProvider(e *echo.Echo) {
+	e.GET("/providers", getProviders)
 	e.GET("/providers/:id", getProvider)
 	e.PUT("/providers/:id", putProvider)
 	e.GET("/providers/:id/run", getProviderRun)
+}
+
+func getProviders(c echo.Context) error {
+	ids := []string{}
+	config.Cfg.Providers.Range(func(key any, value any) bool {
+		ids = append(ids, key.(string))
+		return true
+	})
+
+	slices.Sort(ids)
+	return c.JSON(http.StatusOK, ids)
 }
 
 func getProvider(c echo.Context) error {

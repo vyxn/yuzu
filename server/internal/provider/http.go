@@ -31,7 +31,6 @@ type HTTPProvider struct {
 	Headers   map[string]string `json:"headers,omitempty"`
 	Endpoints []Endpoint        `json:"endpoints"`
 	Output    Output            `json:"output"`
-	Schema    string            `json:"schema"`
 }
 
 type Endpoint struct {
