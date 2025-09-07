@@ -57,12 +57,14 @@
   ],
   "output": {
     "type": "xml",
-    "schema": "https://github.com/anansi-project/comicinfo/blob/main/drafts/v2.1/ComicInfo.xsd",
+    "schema": "https://raw.githubusercontent.com/anansi-project/comicinfo/refs/heads/main/drafts/v2.1/ComicInfo.xsd",
     "content": {
-      "Series": "%seriesName%",
-      "Title": "%issueTitle%",
-      "Number": "%issueNumber%",
-      "Summary": "%issueDescription%"
+      "ComicInfo": {
+        "Series": "%seriesName%",
+        "Title": "%issueTitle%",
+        "Number": "%issueNumber%",
+        "Summary": "%issueDescription%"
+      }
     }
   }
 }

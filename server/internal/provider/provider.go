@@ -44,6 +44,13 @@ func New(id string, r io.Reader) (Provider, error) {
 	switch p.Type {
 	case "http":
 		prov, err = newHTTPProvider(id, &p)
+		if err != nil {
+			slog.Warn(
+				"provider not loaded",
+				slog.String("provider", id),
+				slog.Any("reason", err.Error()),
+			)
+		}
 	case "cli":
 	default:
 		slog.Warn("provider type not supported", slog.String("type", p.Type))

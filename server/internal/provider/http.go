@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"maps"
@@ -14,8 +15,11 @@ import (
 	"time"
 
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
+	"github.com/vyxn/yuzu/internal/utils"
 
 	"github.com/AsaiYusuke/jsonpath/v2"
+	"github.com/kaptinlin/jsonschema"
+	xmlparser "github.com/moolekkari/validatexml-go"
 )
 
 type HTTPProvider struct {
@@ -42,9 +46,12 @@ type Endpoint struct {
 }
 
 type Output struct {
-	Type    string            `json:"type"`
-	Schema  string            `json:"schema"`
-	Content map[string]string `json:"content"`
+	Type   string `json:"type"`
+	Schema string `json:"schema"`
+	// If sorting becomes relevant: https://github.com/wk8/go-ordered-map
+	Content    map[string]any     `json:"content"`
+	JSONSchema *jsonschema.Schema `json:"-"`
+	XMLSchema  *xmlparser.Schema  `json:"-"`
 }
 
 func newHTTPProvider(id string, rp *RawProvider) (*HTTPProvider, error) {
@@ -68,6 +75,31 @@ func newHTTPProvider(id string, rp *RawProvider) (*HTTPProvider, error) {
 		}
 	}
 	provider.Envs = envs
+
+	if provider.Output.Schema != "" {
+		rawSchema, err := utils.GetLocalOrRemoteFile(provider.Output.Schema)
+		if err != nil {
+			return nil, err
+		}
+
+		switch provider.Output.Type {
+		case "json":
+			compiler := jsonschema.NewCompiler()
+			schema, err := compiler.Compile(rawSchema)
+			if err != nil {
+				return nil, yerr.WithStackf("parsing schema: %w", err)
+			}
+
+			provider.Output.JSONSchema = schema
+		case "xml":
+			schema, err := xmlparser.ParseXSD(rawSchema)
+			if err != nil {
+				return nil, yerr.WithStackf("parsing schema: %w", err)
+			}
+
+			provider.Output.XMLSchema = schema
+		}
+	}
 
 	return &provider, nil
 }
@@ -189,12 +221,9 @@ func (p *HTTPProvider) Run(inputs map[string]string) ([]byte, error) {
 		}
 	}
 
-	output := map[string]any{}
-	for k, v := range p.Output.Content {
-		output[k] = getFromRunEnv(runEnv, v)
-	}
+	output := utils.SubstituteKeys(runEnv, p.Output.Content)
 
-	// Generate Output
+	// Generate Outputxml
 	switch p.Output.Type {
 	case "json":
 		data, err := json.MarshalIndent(output, "", "  ")
@@ -202,17 +231,61 @@ func (p *HTTPProvider) Run(inputs map[string]string) ([]byte, error) {
 			return nil, yerr.WithStackf("marshalling to json: %w", err)
 		}
 
+		if err := p.validateOutputSchema(data); err != nil {
+			return nil, err
+		}
+
 		return data, nil
 	case "xml":
-		data, err := MapToXML(output, "content")
+		data, err := MapToXML(output)
 		if err != nil {
 			return nil, yerr.WithStackf("marshalling to xml: %w", err)
+		}
+
+		if err := p.validateOutputSchema(data); err != nil {
+			return nil, err
 		}
 
 		return data, nil
 
 	default:
 		return nil, yerr.WithStackf("output type %s not supported", p.Output.Type)
+	}
+}
+
+func (p *HTTPProvider) validateOutputSchema(data []byte) error {
+	if p.Output.Schema == "" {
+		return nil
+	}
+
+	switch p.Output.Type {
+	case "json":
+		res := p.Output.JSONSchema.ValidateJSON(data)
+
+		if !res.IsValid() {
+			errs := ""
+			for path, message := range res.GetDetailedErrors() {
+				errs += fmt.Sprintf("\n- %s: %s", path, message)
+				slog.Info(
+					"validation result",
+					slog.String("path", path),
+					slog.String("message", message),
+				)
+
+			}
+			return yerr.WithStackf("validating json output: %s", errs)
+		}
+
+		return nil
+	case "xml":
+		doc, err := xmlparser.Parse(data)
+		if err != nil {
+			return yerr.WithStackf("parsing output data: %w", err)
+		}
+
+		return p.Output.XMLSchema.Validate(doc)
+	default:
+		return nil
 	}
 }
 
