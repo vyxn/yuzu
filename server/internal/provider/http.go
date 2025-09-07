@@ -18,6 +18,7 @@ import (
 	"github.com/vyxn/yuzu/internal/utils"
 
 	"github.com/AsaiYusuke/jsonpath/v2"
+	"github.com/goccy/go-yaml"
 	"github.com/kaptinlin/jsonschema"
 	xmlparser "github.com/moolekkari/validatexml-go"
 )
@@ -82,7 +83,7 @@ func newHTTPProvider(id string, rp *RawProvider) (*HTTPProvider, error) {
 		}
 
 		switch provider.Output.Type {
-		case "json":
+		case "json", "yaml":
 			compiler := jsonschema.NewCompiler()
 			schema, err := compiler.Compile(rawSchema)
 			if err != nil {
@@ -118,6 +119,8 @@ func (p *HTTPProvider) MimeType() string {
 		return "application/json"
 	case "xml":
 		return "application/xml"
+	case "yaml":
+		return "application/yaml"
 	default:
 		return ""
 	}
@@ -220,36 +223,34 @@ func (p *HTTPProvider) Run(inputs map[string]string) ([]byte, error) {
 		}
 	}
 
-	output := utils.SubstituteKeys(runEnv, p.Output.Content)
+	return p.generateOutput(utils.SubstituteKeys(runEnv, p.Output.Content))
+}
 
-	// Generate Outputxml
+func (p *HTTPProvider) generateOutput(output any) ([]byte, error) {
+	var data []byte
+	var err error
+
 	switch p.Output.Type {
 	case "json":
-		data, err := json.MarshalIndent(output, "", "  ")
-		if err != nil {
-			return nil, yerr.WithStackf("marshalling to json: %w", err)
-		}
-
-		if err := p.validateOutputSchema(data); err != nil {
-			return nil, err
-		}
-
-		return data, nil
+		data, err = json.MarshalIndent(output, "", "  ")
 	case "xml":
-		data, err := MapToXML(output)
-		if err != nil {
-			return nil, yerr.WithStackf("marshalling to xml: %w", err)
-		}
-
-		if err := p.validateOutputSchema(data); err != nil {
-			return nil, err
-		}
-
-		return data, nil
+		data, err = MapToXML(output)
+	case "yaml":
+		data, err = yaml.MarshalWithOptions(output, yaml.Indent(2))
 
 	default:
 		return nil, yerr.WithStackf("output type %s not supported", p.Output.Type)
 	}
+
+	if err != nil {
+		return nil, yerr.WithStackf("marshalling to %s: %w", p.Output.Type, err)
+	}
+
+	if err := p.validateOutputSchema(data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func (p *HTTPProvider) validateOutputSchema(data []byte) error {
