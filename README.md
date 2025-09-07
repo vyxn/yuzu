@@ -20,6 +20,7 @@
 - [x] add support for md frontmatter output
 - [x] handle querying all providers
 - [x] allow to delete a provider
+- [ ] rate limiting for provider
 
 ### Library
 - [ ] make basic structure of a library
@@ -29,3 +30,4 @@
 - [ ] handle querying all libraries and a single library
 - [ ] allow create and update a library
 - [ ] add run job now
+- [ ] optimize number of provider runs with gorutines
