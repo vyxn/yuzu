@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"path/filepath"
 
+	"github.com/robfig/cron/v3"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	// "os"
 	// "path"
@@ -21,6 +22,7 @@ import (
 type Library struct {
 	Path      string    `json:"path"`
 	Selectors Selectors `json:"selectors"`
+	Jobs      []*Job    `json:"jobs"`
 }
 
 func New(id string, r io.Reader) (*Library, error) {
@@ -52,6 +54,16 @@ func (l *Library) Select() []*Selection {
 	})
 
 	return res
+}
+
+func (l *Library) AllJobs() []*Job {
+	return l.Jobs
+}
+
+func (l *Library) ScheduleJobs(c *cron.Cron) {
+	for _, j := range l.Jobs {
+		c.Schedule(j.schedule, j)
+	}
 }
 
 // func Process(dir string) error {

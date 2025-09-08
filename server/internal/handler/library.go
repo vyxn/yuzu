@@ -3,6 +3,8 @@ package handler
 import (
 	"net/http"
 	"slices"
+	"strings"
+	"time"
 
 	"github.com/vyxn/yuzu/internal/library"
 
@@ -15,6 +17,7 @@ func registerLibrary(e *echo.Echo) {
 	e.GET("/libraries", getLibraries)
 	e.GET("/libraries/:id", getLibrary)
 	e.GET("/libraries/:id/select", getLibrarySelect)
+	e.GET("/libraries/:id/jobs", getLibraryJobs)
 }
 
 func getLibraries(c echo.Context) error {
@@ -53,6 +56,38 @@ func getLibrarySelect(c echo.Context) error {
 	}
 
 	return echo.ErrNotFound
+}
+
+func getLibraryJobs(c echo.Context) error {
+	id := c.Param("id")
+
+	l, ok := config.Cfg.Libraries.Load(id)
+	if !ok {
+		return echo.ErrNotFound
+	}
+
+	lib, ok := l.(*library.Library)
+	if !ok {
+		return echo.ErrNotFound
+	}
+
+	res := []map[string]string{}
+	now := time.Now()
+	for _, j := range lib.AllJobs() {
+		next := j.Next(now)
+		providers := []string{}
+		for _, p := range j.Providers {
+			providers = append(providers, p.ID)
+		}
+
+		res = append(res, map[string]string{
+			"providers":     strings.Join(providers, ","),
+			"scheduled for": next.Local().String(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, res)
+
 }
 
 func lib(c echo.Context) error {

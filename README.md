@@ -23,12 +23,13 @@
 - [ ] rate limiting for provider
 
 ### Library
-- [ ] make basic structure of a library
-- [ ] define library jobs structure
-- [ ] see how to link with providers
-- [ ] allow scheduling of jobs with crontab syntax
-- [ ] handle querying all libraries and a single library
+- [x] make basic structure of a library
+- [x] define library jobs structure
+- [x] see how to link with providers
+- [x] allow scheduling of jobs with crontab syntax
+- [x] handle querying all libraries and a single library
 - [ ] allow create and update a library
+- [ ] allow delete a library
 - [ ] add run job now
 - [ ] optimize number of provider runs with gorutines
 

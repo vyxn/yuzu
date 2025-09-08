@@ -11,9 +11,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/robfig/cron/v3"
 	"github.com/vyxn/yuzu/internal"
 	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/handler"
+	"github.com/vyxn/yuzu/internal/library"
 	"github.com/vyxn/yuzu/internal/pkg/log"
 
 	"github.com/joho/godotenv"
@@ -67,6 +69,23 @@ func main() {
 	internal.SetupMiddleware(e)
 	internal.SetupErrorHandling(e)
 	handler.SetupRoutes(e)
+
+	c := cron.New()
+	config.Cfg.Libraries.Range(func(key any, value any) bool {
+		l, ok := value.(*library.Library)
+		if !ok {
+			return true
+		}
+
+		l.ScheduleJobs(c)
+
+		return true
+	})
+	go c.Run()
+	defer func() {
+		ctx := c.Stop()
+		<-ctx.Done()
+	}()
 
 	port := ":8080"
 	logger.Info("http server started", slog.String("port", port))

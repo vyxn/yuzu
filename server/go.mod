@@ -13,6 +13,7 @@ require (
 	github.com/kaptinlin/jsonschema v0.4.12
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/moolekkari/validatexml-go v0.1.0
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/syncthing/notify v0.0.0-20250528144937-c7027d4f7465
 )
 
