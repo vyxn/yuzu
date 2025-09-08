@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,8 @@ func registerLibrary(e *echo.Echo) {
 	e.DELETE("/libraries/:id", deleteLibrary)
 	e.GET("/libraries/:id/select", getLibrarySelect)
 	e.GET("/libraries/:id/jobs", getLibraryJobs)
+	e.GET("/libraries/:id/jobs/:job", getLibraryJob)
+	e.GET("/libraries/:id/jobs/:job/run", getRunJob)
 }
 
 func getLibraries(c echo.Context) error {
@@ -114,7 +117,59 @@ func getLibraryJobs(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, res)
+}
 
+func getLibraryJob(c echo.Context) error {
+	id := c.Param("id")
+	job, err := strconv.Atoi(c.Param("job"))
+	if err != nil {
+		return echo.ErrBadRequest.SetInternal(err)
+	}
+
+	l, ok := config.Cfg.Libraries.Load(id)
+	if !ok {
+		return echo.ErrNotFound
+	}
+
+	lib, ok := l.(*library.Library)
+	if !ok {
+		return echo.ErrNotFound
+	}
+
+	jobs := lib.AllJobs()
+	if len(jobs) <= job {
+		return echo.ErrBadRequest
+	}
+
+	return c.JSON(http.StatusOK, jobs[job])
+}
+
+func getRunJob(c echo.Context) error {
+	id := c.Param("id")
+	j, err := strconv.Atoi(c.Param("job"))
+	if err != nil {
+		return echo.ErrBadRequest.SetInternal(err)
+	}
+
+	l, ok := config.Cfg.Libraries.Load(id)
+	if !ok {
+		return echo.ErrNotFound
+	}
+
+	lib, ok := l.(*library.Library)
+	if !ok {
+		return echo.ErrNotFound
+	}
+
+	jobs := lib.AllJobs()
+	if len(jobs) <= j {
+		return echo.ErrBadRequest
+	}
+
+	job := jobs[j]
+	go job.Run()
+
+	return c.JSON(http.StatusOK, "run job")
 }
 
 func lib(c echo.Context) error {

@@ -30,7 +30,7 @@
 - [x] handle querying all libraries and a single library
 - [x] allow create and update a library
 - [x] allow delete a library
-- [ ] add run job now
+- [x] add run job now
 
 ### Job
 - [ ] make base flow of a job run
