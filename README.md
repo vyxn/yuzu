@@ -28,9 +28,12 @@
 - [x] see how to link with providers
 - [x] allow scheduling of jobs with crontab syntax
 - [x] handle querying all libraries and a single library
-- [ ] allow create and update a library
-- [ ] allow delete a library
+- [x] allow create and update a library
+- [x] allow delete a library
 - [ ] add run job now
+
+### Job
+- [ ] make base flow of a job run
 - [ ] optimize number of provider runs with gorutines
 
 ### Additional Providers

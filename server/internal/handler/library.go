@@ -16,6 +16,8 @@ func registerLibrary(e *echo.Echo) {
 	e.GET("/lib", lib)
 	e.GET("/libraries", getLibraries)
 	e.GET("/libraries/:id", getLibrary)
+	e.PUT("/libraries/:id", putLibrary)
+	e.DELETE("/libraries/:id", deleteLibrary)
 	e.GET("/libraries/:id/select", getLibrarySelect)
 	e.GET("/libraries/:id/jobs", getLibraryJobs)
 }
@@ -39,6 +41,31 @@ func getLibrary(c echo.Context) error {
 	}
 
 	return echo.ErrNotFound
+}
+
+func putLibrary(c echo.Context) error {
+	id := c.Param("id")
+
+	l, err := library.New(id, c.Request().Body)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "parsing library").
+			SetInternal(err)
+	}
+
+	config.StoreLibrary(id, l)
+	return c.JSON(http.StatusOK, l)
+}
+
+func deleteLibrary(c echo.Context) error {
+	id := c.Param("id")
+
+	if err := config.DeleteLibrary(id); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "deleting library").
+			SetInternal(err)
+	}
+
+	config.Info()
+	return c.NoContent(http.StatusNoContent)
 }
 
 func getLibrarySelect(c echo.Context) error {

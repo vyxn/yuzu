@@ -2,7 +2,9 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -71,14 +73,37 @@ func UnloadLibrary(path string) {
 	}
 }
 
-// func StoreLibrary(id string, p *library.Library) error {
-// 	subpath := filepath.Join(dirLibraries, id+".json")
-//
-// 	pr, pw := io.Pipe()
-//
-// 	go Cfg.StoreFile(subpath, pr)
-// 	return p.Store(pw)
-// }
+func StoreLibrary(id string, l *library.Library) error {
+	subpath := filepath.Join(dirLibraries, id+".json")
+
+	pr, pw := io.Pipe()
+
+	go Cfg.StoreFile(subpath, pr)
+	e := json.NewEncoder(pw)
+	e.SetIndent("", "  ")
+	return e.Encode(l)
+}
+
+func DeleteLibrary(id string) error {
+	l, ok := Cfg.Libraries.Load(id)
+	if !ok {
+		return yerr.WithStackf("library with id %q not found", id)
+	}
+
+	libs, ok := l.(*library.Library)
+	if !ok {
+		return yerr.WithStackf("couldn't coerce library with id %q", id)
+	}
+
+	if err := os.Remove(libs.ConfigPath()); err != nil {
+		return yerr.WithStackf("couldn't remove library %q: %w", id, err)
+	}
+
+	// Clear cached values
+	Cfg.Libraries.Delete(id)
+	libraryPaths.Delete(libs.ConfigPath())
+	return nil
+}
 
 func LoadLibraries() error {
 	return Cfg.GetFiles(

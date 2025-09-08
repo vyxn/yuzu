@@ -8,8 +8,9 @@ import (
 	"log/slog"
 	"path/filepath"
 
-	"github.com/robfig/cron/v3"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
+
+	"github.com/robfig/cron/v3"
 	// "os"
 	// "path"
 	// "regexp"
@@ -20,19 +21,24 @@ import (
 // var re = regexp.MustCompile(`(?i)^.*?(?:chapter|ch|c)?\s?(\d+).*\.cbz$`)
 
 type Library struct {
-	Path      string    `json:"path"`
-	Selectors Selectors `json:"selectors"`
-	Jobs      []*Job    `json:"jobs"`
+	configPath string    `json:"-"`
+	Path       string    `json:"path"`
+	Selectors  Selectors `json:"selectors"`
+	Jobs       []*Job    `json:"jobs"`
 }
 
-func New(id string, r io.Reader) (*Library, error) {
+func New(path string, r io.Reader) (*Library, error) {
 	var l Library
 	d := json.NewDecoder(r)
 	if err := d.Decode(&l); err != nil {
-		return nil, yerr.WithStackf("unmarshaling library JSON: %w", err)
+		return nil, yerr.WithStackf("unmarshaling library %q: %w", path, err)
 	}
+	l.configPath = path
 
 	return &l, nil
+}
+func (l *Library) ConfigPath() string {
+	return l.configPath
 }
 
 func (l *Library) Select() []*Selection {
