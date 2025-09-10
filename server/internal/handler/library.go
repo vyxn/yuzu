@@ -2,102 +2,123 @@ package handler
 
 import (
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/vyxn/yuzu/internal/library"
+	"github.com/vyxn/yuzu/internal/repository"
 
 	"github.com/labstack/echo/v4"
-	"github.com/vyxn/yuzu/internal/config"
 )
 
-func registerLibrary(e *echo.Echo) {
-	e.GET("/lib", lib)
-	e.GET("/libraries", getLibraries)
-	e.GET("/libraries/:id", getLibrary)
-	e.PUT("/libraries/:id", putLibrary)
-	e.DELETE("/libraries/:id", deleteLibrary)
-	e.GET("/libraries/:id/select", getLibrarySelect)
-	e.GET("/libraries/:id/jobs", getLibraryJobs)
-	e.GET("/libraries/:id/jobs/:job", getLibraryJob)
-	e.GET("/libraries/:id/jobs/:job/run", getRunJob)
+func registerLibrary(
+	e *echo.Echo,
+	r repository.Repository[*repository.Library, string],
+) {
+	h := NewLibraryHandler(r)
+
+	// e.GET("/lib", lib)
+	e.GET("/libraries", h.getLibraries)
+	e.GET("/libraries/:id", h.getLibrary)
+	e.PUT("/libraries/:id", h.putLibrary)
+	e.DELETE("/libraries/:id", h.deleteLibrary)
+	e.GET("/libraries/:id/select", h.getLibrarySelect)
+	e.GET("/libraries/:id/jobs", h.getLibraryJobs)
+	e.GET("/libraries/:id/jobs/:job", h.getLibraryJob)
+	e.GET("/libraries/:id/jobs/:job/run", h.getRunJob)
 }
 
-func getLibraries(c echo.Context) error {
-	ids := []string{}
-	config.Cfg.Libraries.Range(func(key any, value any) bool {
-		ids = append(ids, key.(string))
-		return true
-	})
-
-	slices.Sort(ids)
-	return c.JSON(http.StatusOK, ids)
+type LibraryHandler struct {
+	r repository.Repository[*repository.Library, string]
 }
 
-func getLibrary(c echo.Context) error {
+func NewLibraryHandler(
+	r repository.Repository[*repository.Library, string],
+) *LibraryHandler {
+	return &LibraryHandler{r: r}
+}
+
+func (h *LibraryHandler) getLibraries(c echo.Context) error {
+	all, err := h.r.GetAll()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "getting libraries").
+			SetInternal(err)
+	}
+	return c.JSON(http.StatusOK, all)
+}
+
+func (h *LibraryHandler) getLibrary(c echo.Context) error {
 	id := c.Param("id")
 
-	if l, ok := config.Cfg.Libraries.Load(id); ok {
-		return c.JSON(http.StatusOK, l)
+	lib, err := h.r.Get(id)
+	if err != nil {
+		return echo.ErrNotFound
 	}
 
-	return echo.ErrNotFound
+	return c.JSON(http.StatusOK, lib)
 }
 
-func putLibrary(c echo.Context) error {
+func (h *LibraryHandler) putLibrary(c echo.Context) error {
 	id := c.Param("id")
 
-	l, err := library.New(id, c.Request().Body)
+	lib, err := repository.NewLibrary(id, c.Request().Body)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "parsing library").
 			SetInternal(err)
 	}
 
-	config.StoreLibrary(id, l)
-	return c.JSON(http.StatusOK, l)
+	// do extra validations
+	if _, err := library.FromRepo(lib); err != nil {
+		return echo.NewHTTPError(http.StatusUnprocessableEntity, "validating library").
+			SetInternal(err)
+	}
+
+	if err := h.r.Save(lib); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "saving library").
+			SetInternal(err)
+	}
+
+	return c.JSON(http.StatusOK, lib)
 }
 
-func deleteLibrary(c echo.Context) error {
+func (h *LibraryHandler) deleteLibrary(c echo.Context) error {
 	id := c.Param("id")
 
-	if err := config.DeleteLibrary(id); err != nil {
+	if err := h.r.Delete(id); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "deleting library").
 			SetInternal(err)
 	}
 
-	config.Info()
 	return c.NoContent(http.StatusNoContent)
 }
 
-func getLibrarySelect(c echo.Context) error {
+func (h *LibraryHandler) getLibrarySelect(c echo.Context) error {
 	id := c.Param("id")
 
-	if l, ok := config.Cfg.Libraries.Load(id); ok {
-		lib, ok := l.(*library.Library)
-		if !ok {
-			return echo.ErrNotFound
-		}
-
-		res := lib.Select()
-
-		return c.JSON(http.StatusOK, res)
-	}
-
-	return echo.ErrNotFound
-}
-
-func getLibraryJobs(c echo.Context) error {
-	id := c.Param("id")
-
-	l, ok := config.Cfg.Libraries.Load(id)
-	if !ok {
+	l, err := h.r.Get(id)
+	if err != nil {
 		return echo.ErrNotFound
 	}
 
-	lib, ok := l.(*library.Library)
-	if !ok {
+	lib, err := library.FromRepo(l)
+	if err != nil {
+		return echo.ErrNotFound
+	}
+
+	return c.JSON(http.StatusOK, lib.Select())
+}
+
+func (h *LibraryHandler) getLibraryJobs(c echo.Context) error {
+	id := c.Param("id")
+
+	l, err := h.r.Get(id)
+	if err != nil {
+		return echo.ErrNotFound
+	}
+
+	lib, err := library.FromRepo(l)
+	if err != nil {
 		return echo.ErrNotFound
 	}
 
@@ -119,20 +140,20 @@ func getLibraryJobs(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-func getLibraryJob(c echo.Context) error {
+func (h *LibraryHandler) getLibraryJob(c echo.Context) error {
 	id := c.Param("id")
 	job, err := strconv.Atoi(c.Param("job"))
 	if err != nil {
 		return echo.ErrBadRequest.SetInternal(err)
 	}
 
-	l, ok := config.Cfg.Libraries.Load(id)
-	if !ok {
+	l, err := h.r.Get(id)
+	if err != nil {
 		return echo.ErrNotFound
 	}
 
-	lib, ok := l.(*library.Library)
-	if !ok {
+	lib, err := library.FromRepo(l)
+	if err != nil {
 		return echo.ErrNotFound
 	}
 
@@ -144,20 +165,20 @@ func getLibraryJob(c echo.Context) error {
 	return c.JSON(http.StatusOK, jobs[job])
 }
 
-func getRunJob(c echo.Context) error {
+func (h *LibraryHandler) getRunJob(c echo.Context) error {
 	id := c.Param("id")
 	j, err := strconv.Atoi(c.Param("job"))
 	if err != nil {
 		return echo.ErrBadRequest.SetInternal(err)
 	}
 
-	l, ok := config.Cfg.Libraries.Load(id)
-	if !ok {
+	l, err := h.r.Get(id)
+	if err != nil {
 		return echo.ErrNotFound
 	}
 
-	lib, ok := l.(*library.Library)
-	if !ok {
+	lib, err := library.FromRepo(l)
+	if err != nil {
 		return echo.ErrNotFound
 	}
 
@@ -172,10 +193,10 @@ func getRunJob(c echo.Context) error {
 	return c.JSON(http.StatusOK, "run job")
 }
 
-func lib(c echo.Context) error {
-	// err := lib.Process("testlib")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	return c.String(http.StatusOK, "all good")
-}
+// func lib(c echo.Context) error {
+// 	// err := lib.Process("testlib")
+// 	// if err != nil {
+// 	// 	panic(err)
+// 	// }
+// 	return c.String(http.StatusOK, "all good")
+// }

@@ -1,47 +1,52 @@
 package library
 
 import (
-	"encoding/json"
-	"fmt"
+	"log/slog"
 	"time"
+
+	"github.com/vyxn/yuzu/internal/pkg/yerr"
+	"github.com/vyxn/yuzu/internal/repository"
 
 	"github.com/robfig/cron/v3"
 )
 
 type Job struct {
-	Schedule  string        `json:"schedule"`
-	schedule  cron.Schedule `json:"-"`
-	Providers []JobProvider `json:"providers"`
+	Schedule  string
+	schedule  cron.Schedule
+	Providers []JobProvider
+	library   *Library
 }
 
-func (j *Job) UnmarshalJSON(data []byte) error {
-	// shadow type to avoid recursion
-	type Alias Job
-	aux := &struct {
-		*Alias
-	}{
-		Alias: (*Alias)(j),
+func NewJob(j *repository.Job) (*Job, error) {
+	jps := []JobProvider{}
+	for _, jp := range j.Providers {
+		jps = append(jps, NewJobProvider(jp))
 	}
 
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
+	job := &Job{
+		Schedule:  j.Schedule,
+		Providers: jps,
 	}
 
 	if j.Schedule != "" {
 		sch, err := cron.ParseStandard(j.Schedule)
 		if err != nil {
-			return fmt.Errorf("invalid schedule %q: %w", j.Schedule, err)
+			return nil, yerr.WithStackf("invalid schedule %q: %w", j.Schedule, err)
 		}
 
-		j.schedule = sch
+		job.schedule = sch
 	}
 
-	return nil
+	return job, nil
 }
 
 type JobProvider struct {
-	ID     string            `json:"id"`
-	Inputs map[string]string `json:"inputs"`
+	ID     string
+	Inputs map[string]string
+}
+
+func NewJobProvider(jp repository.JobProvider) JobProvider {
+	return JobProvider{ID: jp.ID, Inputs: jp.Inputs}
 }
 
 // Next returns the next time this job would be called after the provided time

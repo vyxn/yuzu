@@ -11,12 +11,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/robfig/cron/v3"
+	// "github.com/robfig/cron/v3"
 	"github.com/vyxn/yuzu/internal"
 	"github.com/vyxn/yuzu/internal/config"
 	"github.com/vyxn/yuzu/internal/handler"
-	"github.com/vyxn/yuzu/internal/library"
+	// "github.com/vyxn/yuzu/internal/library"
 	"github.com/vyxn/yuzu/internal/pkg/log"
+	"github.com/vyxn/yuzu/internal/repository"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -47,14 +48,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := config.LoadLibraries(); err != nil {
+	libRepo, err := repository.NewFileLibraryRepository(
+		ctx,
+		"libraries",
+		config.Cfg.Paths,
+	)
+	if err != nil {
 		panic(err)
 	}
+
 	if err := config.Load(); err != nil {
 		panic(err)
 	}
 	config.WatchProviders(ctx)
-	config.Info()
 
 	db := internal.GetDB()
 	if err := db.Ping(); err != nil {
@@ -68,24 +74,18 @@ func main() {
 
 	internal.SetupMiddleware(e)
 	internal.SetupErrorHandling(e)
-	handler.SetupRoutes(e)
+	handler.SetupRoutes(e, libRepo)
 
-	c := cron.New()
-	config.Cfg.Libraries.Range(func(key any, value any) bool {
-		l, ok := value.(*library.Library)
-		if !ok {
-			return true
-		}
-
-		l.ScheduleJobs(c)
-
-		return true
-	})
-	go c.Run()
-	defer func() {
-		ctx := c.Stop()
-		<-ctx.Done()
-	}()
+	// c := cron.New()
+	// libs, err := libRepo.GetAll()
+	// for _, lib := range libs {
+	// 	lib.ScheduleJobs(c)
+	// }
+	// go c.Run()
+	// defer func() {
+	// 	ctx := c.Stop()
+	// 	<-ctx.Done()
+	// }()
 
 	port := ":8080"
 	logger.Info("http server started", slog.String("port", port))
