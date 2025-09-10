@@ -1,3 +1,5 @@
+// Package repository handles persistence of our internal logic entities
+// in an abstract fashion
 package repository
 
 import (

@@ -56,11 +56,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	if err := config.Load(); err != nil {
+	provRepo, err := repository.NewFileProviderRepository(
+		ctx,
+		"providers",
+		config.Cfg.Paths,
+	)
+	if err != nil {
 		panic(err)
 	}
-	config.WatchProviders(ctx)
 
 	db := internal.GetDB()
 	if err := db.Ping(); err != nil {
@@ -74,7 +77,7 @@ func main() {
 
 	internal.SetupMiddleware(e)
 	internal.SetupErrorHandling(e)
-	handler.SetupRoutes(e, libRepo)
+	handler.SetupRoutes(e, libRepo, provRepo)
 
 	// c := cron.New()
 	// libs, err := libRepo.GetAll()

@@ -17,8 +17,6 @@ import (
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 )
 
-const dirLibraries = "libraries"
-
 var allowedExtensions = []string{".json"}
 
 type Library struct {
@@ -175,7 +173,7 @@ func (r *FileLibraryRepository) watch(ctx context.Context) {
 			continue
 		}
 
-		d := filepath.Join(dir, dirLibraries)
+		d := filepath.Join(dir, r.subdir)
 		go Watch(ctx, d, r.load, r.unload)
 	}
 }
@@ -205,7 +203,7 @@ func (r *FileLibraryRepository) Get(id string) (*Library, error) {
 }
 
 func (r *FileLibraryRepository) Save(lib *Library) error {
-	subpath := filepath.Join(dirLibraries, lib.ID+".json")
+	subpath := filepath.Join(r.subdir, lib.ID+".json")
 
 	pr, pw := io.Pipe()
 

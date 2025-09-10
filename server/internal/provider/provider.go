@@ -9,9 +9,9 @@ import (
 )
 
 type Provider interface {
-	ProviderID() string
-	GetPath() string
-	Store(io.Writer) error
+	ID() string
+	ClearID()
+	MimeType() string
 	Run(map[string]string) ([]byte, error)
 }
 
@@ -33,7 +33,7 @@ func (p *RawProvider) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(data, &aux)
 }
 
-func New(path string, r io.Reader) (Provider, error) {
+func NewProvider(path string, r io.Reader) (Provider, error) {
 	var p RawProvider
 	d := json.NewDecoder(r)
 	if err := d.Decode(&p); err != nil {

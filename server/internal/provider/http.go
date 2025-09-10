@@ -26,8 +26,7 @@ import (
 )
 
 type HTTPProvider struct {
-	ID        string            `json:"-"                 jsonschema:"-"`
-	Path      string            `json:"-"                 jsonschema:"-"`
+	Id        string            `json:"id,omitempty"      jsonschema:"-"`
 	Type      string            `json:"type"              jsonschema:"required,enum=http"`
 	Inputs    map[string]string `json:"inputs"            jsonschema:"required,minProperties=1"`
 	Envs      map[string]string `json:"envs,omitempty"    jsonschema:""`
@@ -79,8 +78,7 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 		return nil, yerr.WithStackf("unmarshaling provider JSON: %v", err)
 	}
 
-	provider.ID = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	provider.Path = path
+	provider.Id = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 
 	envs := make(map[string]string)
 	for env, placeholder := range provider.Envs {
@@ -89,7 +87,7 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 		} else {
 			slog.Warn(
 				"provider env is not configured",
-				slog.String("provider", provider.ID),
+				slog.String("provider", provider.Id),
 				slog.String("env", env),
 				slog.String("placeholder", placeholder),
 			)
@@ -125,17 +123,12 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 	return &provider, nil
 }
 
-func (p *HTTPProvider) ProviderID() string {
-	return p.ID
+func (p *HTTPProvider) ID() string {
+	return p.Id
 }
 
-func (p *HTTPProvider) GetPath() string {
-	return p.Path
-}
-
-func (p *HTTPProvider) Store(w io.Writer) error {
-	e := json.NewEncoder(w)
-	return e.Encode(p)
+func (p *HTTPProvider) ClearID() {
+	p.Id = ""
 }
 
 func (p *HTTPProvider) MimeType() string {
@@ -281,7 +274,11 @@ func (p *HTTPProvider) generateOutput(content any) ([]byte, error) {
 	}
 
 	if dataErr != nil {
-		return nil, yerr.WithStackf("marshalling data to %s: %w", p.Output.Type, dataErr)
+		return nil, yerr.WithStackf(
+			"marshalling data to %s: %w",
+			p.Output.Type,
+			dataErr,
+		)
 	}
 
 	if data == nil {

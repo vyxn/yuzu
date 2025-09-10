@@ -53,7 +53,7 @@ func (h *LibraryHandler) getLibrary(c echo.Context) error {
 
 	lib, err := h.r.Get(id)
 	if err != nil {
-		return echo.ErrNotFound
+		return echo.ErrNotFound.SetInternal(err)
 	}
 
 	return c.JSON(http.StatusOK, lib)
