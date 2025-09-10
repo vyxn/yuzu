@@ -1,50 +1,55 @@
 package library
 
 import (
+	"encoding/json"
+	"fmt"
 	"maps"
 	"path/filepath"
 	"regexp"
-
-	"github.com/vyxn/yuzu/internal/pkg/yerr"
-	"github.com/vyxn/yuzu/internal/repository"
 )
 
 type Selectors []*Selector
 
 type Selector struct {
-	Type     string
-	Regex    string
-	Captures map[string]int
-	re       *regexp.Regexp
+	Type     string         `json:"type"`
+	Regex    string         `json:"regex"`
+	Captures map[string]int `json:"captures"`
+	r        *regexp.Regexp `json:"-"`
 }
 
-func NewSelectors(s repository.Selectors) (Selectors, error) {
-	selectors := []*Selector{}
-	for _, sel := range s {
-		re, err := regexp.Compile(sel.Regex)
+func (s *Selector) UnmarshalJSON(data []byte) error {
+	// shadow type to avoid recursion
+	type Alias Selector
+	aux := &struct {
+		*Alias
+	}{
+		Alias: (*Alias)(s),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if s.Regex != "" {
+		re, err := regexp.Compile(s.Regex)
 		if err != nil {
-			return nil, yerr.WithStackf("invalid regex %q: %w", sel.Regex, err)
+			return fmt.Errorf("invalid regex %q: %w", s.Regex, err)
 		}
+		s.r = re
 
 		limit := re.NumSubexp()
-		for k, i := range sel.Captures {
+		for k, i := range s.Captures {
 			if i > limit {
-				return nil, yerr.WithStackf(
+				return fmt.Errorf(
 					"invalid capture index on key %q: regex limit %d",
-					k, limit,
+					k,
+					limit,
 				)
 			}
 		}
-
-		selectors = append(selectors, &Selector{
-			Type:     sel.Type,
-			Regex:    sel.Regex,
-			Captures: sel.Captures,
-			re:       re,
-		})
 	}
 
-	return selectors, nil
+	return nil
 }
 
 type Selection struct {
@@ -101,7 +106,7 @@ func (s *Selector) run(isDir bool, path string) map[string]string {
 		return nil
 	}
 
-	matches := s.re.FindStringSubmatch(input)
+	matches := s.r.FindStringSubmatch(input)
 	if matches == nil {
 		return nil
 	}

@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"github.com/vyxn/yuzu/internal/library"
 	"github.com/vyxn/yuzu/internal/provider"
 	"github.com/vyxn/yuzu/internal/repository"
 
@@ -9,7 +10,7 @@ import (
 )
 
 func SetupRoutes(e *echo.Echo,
-	r repository.Repository[*repository.Library, string],
+	r repository.Repository[*library.Library, string],
 	pr repository.Repository[provider.Provider, string],
 ) {
 	registerStatic(e)

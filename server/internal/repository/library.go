@@ -14,49 +14,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/vyxn/yuzu/internal/library"
+	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 )
 
 var allowedExtensions = []string{".json"}
 
-type Library struct {
-	ID         string    `json:"-"`
-	configPath string    `json:"-"`
-	Path       string    `json:"path"`
-	Selectors  Selectors `json:"selectors"`
-	Jobs       []*Job    `json:"jobs"`
-}
-
-type Selectors []*Selector
-
-type Selector struct {
-	Type     string         `json:"type"`
-	Regex    string         `json:"regex"`
-	Captures map[string]int `json:"captures"`
-}
-
-type Job struct {
-	Schedule  string        `json:"schedule"`
-	Providers []JobProvider `json:"providers"`
-}
-
-type JobProvider struct {
-	ID     string            `json:"id"`
-	Inputs map[string]string `json:"inputs"`
-}
-
-func NewLibrary(id string, r io.Reader) (*Library, error) {
-	var l Library
-	d := json.NewDecoder(r)
-	if err := d.Decode(&l); err != nil {
-		return nil, yerr.WithStackf("unmarshaling library %q: %w", id, err)
-	}
-
-	l.ID = id
-	return &l, nil
-}
-
-func NewLibraryFromPath(path string) (lib *Library, ferr error) {
+func NewLibraryFromPath(path string) (lib *library.Library, ferr error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, yerr.WithStackf("opening library %q: %v", path, err)
@@ -70,34 +35,37 @@ func NewLibraryFromPath(path string) (lib *Library, ferr error) {
 		}
 	}()
 
-	var l Library
+	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	library.NewLibrary(id, file)
+
+	var l library.Library
 	d := json.NewDecoder(file)
 	if err := d.Decode(&l); err != nil {
 		return nil, yerr.WithStackf("unmarshaling library %q: %w", path, err)
 	}
 
-	l.ID = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	l.configPath = path
 	return &l, nil
 }
 
 type FileLibraryRepository struct {
 	subdir      string
+	configPaths []string
 	libraries   sync.Map
 	paths       sync.Map
-	configPaths []string
+	idToPath    sync.Map
 }
 
 func NewFileLibraryRepository(
 	ctx context.Context,
 	subdir string,
 	configPaths []string,
-) (Repository[*Library, string], error) {
+) (Repository[*library.Library, string], error) {
 	r := &FileLibraryRepository{
 		subdir:      subdir,
+		configPaths: configPaths,
 		libraries:   sync.Map{},
 		paths:       sync.Map{},
-		configPaths: configPaths,
+		idToPath:    sync.Map{},
 	}
 
 	err := r.loadAll()
@@ -156,8 +124,9 @@ func (r *FileLibraryRepository) load(path string) {
 		return
 	}
 
-	r.libraries.Store(lib.ID, lib)
+	r.libraries.Store(lib.Id, lib)
 	r.paths.Store(path, lib)
+	r.idToPath.Store(lib.Id, path)
 }
 
 func (r *FileLibraryRepository) unload(path string) {
@@ -178,32 +147,35 @@ func (r *FileLibraryRepository) watch(ctx context.Context) {
 	}
 }
 
-func (r *FileLibraryRepository) GetAll() ([]*Library, error) {
-	libs := []*Library{}
+func (r *FileLibraryRepository) GetAll() ([]*library.Library, error) {
+	libs := []*library.Library{}
+
 	r.libraries.Range(func(key any, value any) bool {
-		libs = append(libs, value.(*Library))
+		lib, ok := value.(*library.Library)
+		assert.Assert(ok, "unexpected type on libraries sync.Map")
+
+		libs = append(libs, lib)
 		return true
 	})
 
 	return libs, nil
 }
 
-func (r *FileLibraryRepository) Get(id string) (*Library, error) {
+func (r *FileLibraryRepository) Get(id string) (*library.Library, error) {
 	l, ok := r.libraries.Load(id)
 	if !ok {
 		return nil, yerr.WithStackf("library %q not found", id)
 	}
 
-	lib, ok := l.(*Library)
-	if !ok {
-		return nil, yerr.WithStackf("library %q has wrong type", id)
-	}
+	lib, ok := l.(*library.Library)
+	assert.Assert(ok, "unexpected type on libraries sync.Map")
 
 	return lib, nil
 }
 
-func (r *FileLibraryRepository) Save(lib *Library) error {
-	subpath := filepath.Join(r.subdir, lib.ID+".json")
+func (r *FileLibraryRepository) Save(lib *library.Library) error {
+	id := lib.Id
+	subpath := filepath.Join(r.subdir, id+".json")
 
 	pr, pw := io.Pipe()
 
@@ -213,39 +185,37 @@ func (r *FileLibraryRepository) Save(lib *Library) error {
 
 		for _, d := range r.configPaths {
 			path := filepath.Join(d, subpath)
-			err := os.MkdirAll(filepath.Dir(path), 0700)
-			if err != nil {
-				errc <- yerr.WithStackf("couldn't create required dir %q: %w", d, err)
+
+			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+				errc <- yerr.WithStackf("creating required dir %q: %w", d, err)
 				return
 			}
 
 			f, err := os.Create(path)
 			if err != nil {
-				errc <- yerr.WithStackf("couldn't create file %q: %w", path, err)
+				errc <- yerr.WithStackf("creating file %q: %w", path, err)
 				return
 			}
 			defer func() {
 				if err := f.Close(); err != nil {
-					errc <- yerr.WithStackf("couldn't close file %q: %w", path, err)
+					errc <- yerr.WithStackf("closing file %q: %w", path, err)
 					return
 				}
 			}()
 
 			if _, err = io.Copy(f, pr); err != nil {
-				errc <- yerr.WithStackf("couldn't write to file %q: %w", path, err)
+				errc <- yerr.WithStackf("writing file %q: %w", path, err)
 				return
 			}
 
-			id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-			lib.ID = id
-			lib.configPath = path
-
 			r.libraries.Store(id, lib)
 			r.paths.Store(path, lib)
+			r.idToPath.Store(id, path)
 			break
 		}
 	}()
 
+	lib.Id = ""
 	e := json.NewEncoder(pw)
 	e.SetIndent("", "  ")
 	err := e.Encode(lib)
@@ -258,21 +228,20 @@ func (r *FileLibraryRepository) Save(lib *Library) error {
 }
 
 func (r *FileLibraryRepository) Delete(id string) error {
-	l, ok := r.libraries.Load(id)
+	p, ok := r.idToPath.Load(id)
 	if !ok {
-		return yerr.WithStackf("library with id %q not found", id)
+		return yerr.WithStackf("library %q not found", id)
 	}
 
-	libs, ok := l.(*Library)
-	if !ok {
-		return yerr.WithStackf("couldn't coerce library with id %q", id)
-	}
+	path, ok := p.(string)
+	assert.Assert(ok, "unexpected type on libraries sync.Map")
 
-	if err := os.Remove(libs.configPath); err != nil {
+	if err := os.Remove(path); err != nil {
 		return yerr.WithStackf("couldn't remove library %q: %w", id, err)
 	}
 
 	r.libraries.Delete(id)
-	r.paths.Delete(libs.configPath)
+	r.paths.Delete(path)
+	r.idToPath.Delete(id)
 	return nil
 }

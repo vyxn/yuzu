@@ -14,7 +14,7 @@ import (
 
 func registerLibrary(
 	e *echo.Echo,
-	r repository.Repository[*repository.Library, string],
+	r repository.Repository[*library.Library, string],
 ) {
 	h := NewLibraryHandler(r)
 
@@ -30,11 +30,11 @@ func registerLibrary(
 }
 
 type LibraryHandler struct {
-	r repository.Repository[*repository.Library, string]
+	r repository.Repository[*library.Library, string]
 }
 
 func NewLibraryHandler(
-	r repository.Repository[*repository.Library, string],
+	r repository.Repository[*library.Library, string],
 ) *LibraryHandler {
 	return &LibraryHandler{r: r}
 }
@@ -62,15 +62,9 @@ func (h *LibraryHandler) getLibrary(c echo.Context) error {
 func (h *LibraryHandler) putLibrary(c echo.Context) error {
 	id := c.Param("id")
 
-	lib, err := repository.NewLibrary(id, c.Request().Body)
+	lib, err := library.NewLibrary(id, c.Request().Body)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "parsing library").
-			SetInternal(err)
-	}
-
-	// do extra validations
-	if _, err := library.FromRepo(lib); err != nil {
-		return echo.NewHTTPError(http.StatusUnprocessableEntity, "validating library").
 			SetInternal(err)
 	}
 
@@ -96,12 +90,7 @@ func (h *LibraryHandler) deleteLibrary(c echo.Context) error {
 func (h *LibraryHandler) getLibrarySelect(c echo.Context) error {
 	id := c.Param("id")
 
-	l, err := h.r.Get(id)
-	if err != nil {
-		return echo.ErrNotFound
-	}
-
-	lib, err := library.FromRepo(l)
+	lib, err := h.r.Get(id)
 	if err != nil {
 		return echo.ErrNotFound
 	}
@@ -112,12 +101,7 @@ func (h *LibraryHandler) getLibrarySelect(c echo.Context) error {
 func (h *LibraryHandler) getLibraryJobs(c echo.Context) error {
 	id := c.Param("id")
 
-	l, err := h.r.Get(id)
-	if err != nil {
-		return echo.ErrNotFound
-	}
-
-	lib, err := library.FromRepo(l)
+	lib, err := h.r.Get(id)
 	if err != nil {
 		return echo.ErrNotFound
 	}
@@ -147,12 +131,7 @@ func (h *LibraryHandler) getLibraryJob(c echo.Context) error {
 		return echo.ErrBadRequest.SetInternal(err)
 	}
 
-	l, err := h.r.Get(id)
-	if err != nil {
-		return echo.ErrNotFound
-	}
-
-	lib, err := library.FromRepo(l)
+	lib, err := h.r.Get(id)
 	if err != nil {
 		return echo.ErrNotFound
 	}
@@ -172,12 +151,7 @@ func (h *LibraryHandler) getRunJob(c echo.Context) error {
 		return echo.ErrBadRequest.SetInternal(err)
 	}
 
-	l, err := h.r.Get(id)
-	if err != nil {
-		return echo.ErrNotFound
-	}
-
-	lib, err := library.FromRepo(l)
+	lib, err := h.r.Get(id)
 	if err != nil {
 		return echo.ErrNotFound
 	}
