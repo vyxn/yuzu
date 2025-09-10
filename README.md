@@ -1,3 +1,9 @@
+# Tools
+
+- https://www.jsonschemavalidator.net
+- https://regex101.com
+- https://crontab.guru
+
 # TODO
 
 ## Server
