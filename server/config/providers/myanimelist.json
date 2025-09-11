@@ -1,0 +1,57 @@
+{
+  "type": "http",
+  "envs": {
+    "MYANIMELIST_CLIENT_ID": "%clientId%"
+  },
+  "vars": {
+    "%baseUrl%": "https://api.myanimelist.net/v2/manga"
+  },
+  "inputs": {
+    "series": "%series%",
+    "chapter": "%chapter%"
+  },
+  "headers": {
+    "X-MAL-CLIENT-ID": "%clientId%"
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "url": "%baseUrl%",
+      "params": {
+        "q": "%series%"
+      },
+      "responseType": "json",
+      "cache": true,
+      "result": {
+        "%seriesId%": "$.data[0].node.id"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "%baseUrl%/%seriesId%",
+      "params": {
+        "fields": "id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_list_users,num_scoring_users,nsfw,created_at,updated_at,media_type,status,genres,my_list_status,num_volumes,num_chapters,authors{first_name,last_name},background,serialization{name}"
+      },
+      "bodyParams": [
+        ""
+      ],
+      "responseType": "json",
+      "result": {
+        "%title%": "$.title",
+        "%synopsis%": "$.synopsis"
+      }
+    }
+  ],
+  "output": {
+    "type": "xml",
+    "schema": "https://raw.githubusercontent.com/anansi-project/comicinfo/refs/heads/main/drafts/v2.1/ComicInfo.xsd",
+    "content": {
+      "ComicInfo": {
+        "Series": "%title%",
+        "Summary": "%synopsis%",
+        "Notes": "%defaultNote%",
+        "Manga": "YesAndRightToLeft"
+      }
+    }
+  }
+}

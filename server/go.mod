@@ -3,12 +3,17 @@ module github.com/vyxn/yuzu
 go 1.24.4
 
 require (
+	github.com/AsaiYusuke/jsonpath/v2 v2.2.0
 	github.com/fatih/color v1.18.0
 	github.com/glebarez/go-sqlite v1.22.0
+	github.com/goccy/go-yaml v1.18.0
+	github.com/google/uuid v1.6.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
+	github.com/kaptinlin/jsonschema v0.4.12
 	github.com/labstack/echo/v4 v4.13.4
-	golang.org/x/oauth2 v0.26.0
+	github.com/moolekkari/validatexml-go v0.1.0
+	github.com/syncthing/notify v0.0.0-20250528144937-c7027d4f7465
 )
 
 require (
@@ -19,9 +24,13 @@ require (
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-json-experiment/json v0.0.0-20250813233538-9b1f9ea2e11b // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
+	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gohugoio/hugo v0.147.6 // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/gotnospirit/makeplural v0.0.0-20180622080156-a5f48d94d976 // indirect
+	github.com/gotnospirit/messageformat v0.0.0-20221001023931-dfe49f1eb092 // indirect
+	github.com/kaptinlin/go-i18n v0.1.4 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -36,7 +45,7 @@ require (
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
 	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	modernc.org/libc v1.37.6 // indirect
