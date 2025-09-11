@@ -18,19 +18,24 @@ import (
 
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/utils"
-	"golang.org/x/time/rate"
 
 	"github.com/AsaiYusuke/jsonpath/v2"
 	"github.com/goccy/go-yaml"
 	"github.com/kaptinlin/jsonschema"
 	xmlparser "github.com/moolekkari/validatexml-go"
+	"golang.org/x/time/rate"
 )
+
+const defaultBurst = 1
+const defaultMaxRetry = 5
+const defaultCooldown = 2 * time.Second
+
+var defaultRateLimit = rate.Every(time.Second)
 
 type HTTPProvider struct {
 	Id        string            `json:"id,omitempty"      jsonschema:"-"`
 	Type      string            `json:"type"              jsonschema:"required,enum=http"`
-	Limits    *RateLimits       `json:"limits,omitempty"  jsonschema:""`
-	Retry     *Retry            `json:"retry,omitempty"   jsonschema:""`
+	HTTP      *HTTP             `json:"http,omitempty"    jsonschema:""`
 	Inputs    map[string]string `json:"inputs"            jsonschema:"required,minProperties=1"`
 	Envs      map[string]string `json:"envs,omitempty"    jsonschema:""`
 	Vars      map[string]string `json:"vars,omitempty"    jsonschema:""`
@@ -59,15 +64,12 @@ type Output struct {
 	XMLSchema  *xmlparser.Schema  `json:"-"       jsonschema:"-"`
 }
 
-type RateLimits struct {
-	RequestsPerSecond float64       `json:"requestsPerSecond,omitempty"`
-	Burst             int           `json:"burst,omitempty"`
-	MinInterval       time.Duration `json:"minInterval,omitempty"`
-}
-
-type Retry struct {
-	MaxRetries uint          `json:"maxRetries"`
-	Cooldown   time.Duration `json:"cooldown"`
+type HTTP struct {
+	Timeout           time.Duration `json:"timeout,omitempty"           jsonschema:""`
+	RequestsPerSecond float64       `json:"requestsPerSecond,omitempty" jsonschema:""`
+	Burst             int           `json:"burst,omitempty"             jsonschema:""`
+	MaxRetries        int           `json:"maxRetries,omitempty"        jsonschema:""`
+	Cooldown          time.Duration `json:"cooldown,omitempty"          jsonschema:""`
 }
 
 func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
@@ -83,7 +85,6 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 				slog.String("path", path),
 				slog.String("message", message),
 			)
-
 		}
 		return nil, yerr.WithStackf("validating provider json schema: %s", errs)
 	}
@@ -135,28 +136,26 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 		}
 	}
 
-	rateLimit := rate.Every(time.Second)
-	burst := 1
-	if provider.Limits != nil {
-		if provider.Limits.RequestsPerSecond != 0 {
-			rateLimit = rate.Limit(provider.Limits.RequestsPerSecond)
+	rateLimit := defaultRateLimit
+	burst := defaultBurst
+	maxRetry := defaultMaxRetry
+	cooldown := defaultCooldown
+	if provider.HTTP != nil {
+		if provider.HTTP.RequestsPerSecond != 0 {
+			rateLimit = rate.Limit(provider.HTTP.RequestsPerSecond)
 		}
-		if provider.Limits.Burst != 0 {
-			burst = provider.Limits.Burst
+		if provider.HTTP.Burst != 0 {
+			burst = provider.HTTP.Burst
+		}
+
+		if provider.HTTP.MaxRetries != 0 {
+			maxRetry = provider.HTTP.MaxRetries
+		}
+		if provider.HTTP.Cooldown != 0 {
+			cooldown = provider.HTTP.Cooldown
 		}
 	}
 	limiter := rate.NewLimiter(rateLimit, burst)
-
-	maxRetry := uint(1)
-	cooldown := 2 * time.Second
-	if provider.Retry != nil {
-		if provider.Retry.MaxRetries != 0 {
-			maxRetry = provider.Retry.MaxRetries
-		}
-		if provider.Retry.Cooldown != 0 {
-			cooldown = provider.Retry.Cooldown
-		}
-	}
 
 	provider.client = NewAPIClient(limiter, maxRetry, cooldown)
 

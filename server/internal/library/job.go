@@ -98,86 +98,9 @@ func (j *Job) Run() {
 
 				slog.Info("job output", slog.String("output", string(output)))
 			}
+
+			slog.Info("job finished", slog.String("library", j.library.Id))
 		}()
 	}
 	wg.Wait()
 }
-
-// func Process(dir string) error {
-// 	p, ok := config.Cfg.Providers.Load("kitsu")
-// 	if !ok {
-// 		return fmt.Errorf("do better this error")
-// 	}
-//
-// 	entries, err := os.ReadDir(dir)
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// 	for _, e := range entries {
-// 		if e.Type().IsDir() {
-// 			processSeries(
-// 				p.(*provider.HTTPProvider),
-// 				path.Join(dir, e.Name()),
-// 				e.Name(),
-// 			)
-// 		}
-// 	}
-//
-// 	return nil
-// }
-//
-// func processSeries(p *provider.HTTPProvider, dir, series string) error {
-// 	entries, err := os.ReadDir(dir)
-// 	if err != nil {
-// 		return err
-// 	}
-//
-// 	for _, e := range entries {
-// 		if !e.Type().IsDir() {
-// 			processChapter(p, dir, series, e.Name())
-// 		}
-// 	}
-//
-// 	return nil
-// }
-//
-// func processChapter(
-// 	p *provider.HTTPProvider,
-// 	dir, series, chapter string,
-// ) error {
-// 	if path.Ext(chapter) != ".cbz" {
-// 		return nil
-// 	}
-//
-// 	matches := re.FindStringSubmatch(chapter)
-// 	if len(matches) > 1 {
-// 		fmt.Printf(
-// 			"MATCH: %-25s -> Chapter %s -> %+v\n",
-// 			chapter,
-// 			matches[1],
-// 			matches,
-// 		)
-// 		chapterNumber := matches[1]
-//
-// 		ci, err := p.Run(
-// 			map[string]string{"series": series, "chapter": chapterNumber},
-// 		)
-// 		if err != nil {
-// 			return err
-// 		}
-//
-// 		f, err := os.Create(
-// 			path.Join(dir, fmt.Sprintf("%s.ComicInfo.xml", chapterNumber)),
-// 		)
-// 		if err != nil {
-// 			return err
-// 		}
-//
-// 		if _, err := f.Write(ci); err != nil {
-// 			return err
-// 		}
-// 	}
-//
-// 	return nil
-// }

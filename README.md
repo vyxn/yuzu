@@ -26,7 +26,8 @@
 - [x] add support for md frontmatter output
 - [x] handle querying all providers
 - [x] allow to delete a provider
-- [ ] rate limiting for provider
+- [x] rate limiting for provider
+- [ ] try if unmarshaling directly from the json schema library works
 
 ### Library
 - [x] make basic structure of a library
@@ -39,7 +40,7 @@
 - [x] add run job now
 
 ### Job
-- [ ] make base flow of a job run
+- [x] make base flow of a job run
 - [ ] optimize number of provider runs with gorutines
 
 ### Additional Providers

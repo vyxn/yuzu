@@ -10,6 +10,10 @@
     "series": "%series%",
     "chapter": "%chapter%"
   },
+  "http": {
+    "requestsPerSecond": 100,
+    "cooldown": 60000000000
+  },
   "headers": {
     "X-MAL-CLIENT-ID": "%clientId%"
   },
