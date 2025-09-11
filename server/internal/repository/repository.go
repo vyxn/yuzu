@@ -1,4 +1,6 @@
-package config
+// Package repository handles persistence of our internal logic entities
+// in an abstract fashion
+package repository
 
 import (
 	"context"
@@ -10,6 +12,13 @@ import (
 
 	"github.com/syncthing/notify"
 )
+
+type Repository[T any, R any] interface {
+	GetAll() ([]T, error)
+	Get(R) (T, error)
+	Save(T) error
+	Delete(R) error
+}
 
 func Watch(ctx context.Context, root string, load, unload func(path string)) {
 	c := make(chan notify.EventInfo, 1000)
@@ -69,7 +78,7 @@ func Watch(ctx context.Context, root string, load, unload func(path string)) {
 				// 	log.Println("Moved into directory:", e.Path())
 			}
 
-			Info()
+			// Info()
 		}
 	}
 }

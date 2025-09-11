@@ -1,3 +1,9 @@
+# Tools
+
+- https://www.jsonschemavalidator.net
+- https://regex101.com
+- https://crontab.guru
+
 # TODO
 
 ## Server
@@ -23,11 +29,20 @@
 - [ ] rate limiting for provider
 
 ### Library
-- [ ] make basic structure of a library
-- [ ] define library jobs structure
-- [ ] see how to link with providers
-- [ ] allow scheduling of jobs with crontab syntax
-- [ ] handle querying all libraries and a single library
-- [ ] allow create and update a library
-- [ ] add run job now
+- [x] make basic structure of a library
+- [x] define library jobs structure
+- [x] see how to link with providers
+- [x] allow scheduling of jobs with crontab syntax
+- [x] handle querying all libraries and a single library
+- [x] allow create and update a library
+- [x] allow delete a library
+- [x] add run job now
+
+### Job
+- [ ] make base flow of a job run
 - [ ] optimize number of provider runs with gorutines
+
+### Additional Providers
+- [ ] books: goodreads
+- [ ] books: hardcover
+

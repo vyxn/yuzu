@@ -2,83 +2,94 @@ package handler
 
 import (
 	"net/http"
-	"slices"
 
 	"github.com/kaptinlin/jsonschema"
-	"github.com/vyxn/yuzu/internal/config"
-	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/provider"
+	"github.com/vyxn/yuzu/internal/repository"
 
 	"github.com/labstack/echo/v4"
 )
 
-func registerProvider(e *echo.Echo) {
-	e.GET("/providers", getProviders)
-	e.GET("/providers/:id", getProvider)
-	e.PUT("/providers/:id", putProvider)
-	e.DELETE("/providers/:id", deleteProvider)
-	e.GET("/providers/:id/run", getProviderRun)
-	e.GET("/schemas/providers/http", getProviderSchema)
+func registerProvider(
+	e *echo.Echo,
+	r repository.Repository[provider.Provider, string],
+) {
+	h := NewProviderHandler(r)
+
+	e.GET("/providers", h.getProviders)
+	e.GET("/providers/:id", h.getProvider)
+	e.PUT("/providers/:id", h.putProvider)
+	e.DELETE("/providers/:id", h.deleteProvider)
+	e.GET("/providers/:id/run", h.getProviderRun)
+	e.GET("/schemas/providers/http", h.getProviderSchema)
 }
 
-func getProviders(c echo.Context) error {
-	ids := []string{}
-	config.Cfg.Providers.Range(func(key any, value any) bool {
-		ids = append(ids, key.(string))
-		return true
-	})
-
-	slices.Sort(ids)
-	return c.JSON(http.StatusOK, ids)
+type ProviderHandler struct {
+	r repository.Repository[provider.Provider, string]
 }
 
-func getProvider(c echo.Context) error {
+func NewProviderHandler(
+	r repository.Repository[provider.Provider, string],
+) *ProviderHandler {
+	return &ProviderHandler{r: r}
+}
+
+func (h *ProviderHandler) getProviders(c echo.Context) error {
+	all, err := h.r.GetAll()
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "getting providers").
+			SetInternal(err)
+	}
+	return c.JSON(http.StatusOK, all)
+}
+
+func (h *ProviderHandler) getProvider(c echo.Context) error {
 	id := c.Param("id")
 
-	if p, ok := config.Cfg.Providers.Load(id); ok {
-		return c.JSON(http.StatusOK, p)
+	prov, err := h.r.Get(id)
+	if err != nil {
+		return echo.ErrNotFound.SetInternal(err)
 	}
 
-	return echo.ErrNotFound
+	return c.JSON(http.StatusOK, prov)
 }
 
-func putProvider(c echo.Context) error {
+func (h *ProviderHandler) putProvider(c echo.Context) error {
 	id := c.Param("id")
 
-	p, err := provider.New(id, c.Request().Body)
+	p, err := provider.NewProvider(id, c.Request().Body)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "parsing provider").
 			SetInternal(err)
 	}
 
-	config.StoreProvider(id, p)
+	if err := h.r.Save(p); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "saving provider").
+			SetInternal(err)
+	}
+
 	return c.JSON(http.StatusOK, p)
 }
 
-func deleteProvider(c echo.Context) error {
+func (h *ProviderHandler) deleteProvider(c echo.Context) error {
 	id := c.Param("id")
 
-	err := config.DeleteProvider(id)
-	if err != nil {
+	if err := h.r.Delete(id); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "deleting provider").
 			SetInternal(err)
 	}
 
-	config.Info()
 	return c.NoContent(http.StatusNoContent)
 }
 
-func getProviderRun(c echo.Context) error {
+func (h *ProviderHandler) getProviderRun(c echo.Context) error {
 	id := c.Param("id")
 	input := queryToMap(c.QueryParams(), ",")
 
-	pr, ok := config.Cfg.Providers.Load(id)
-	if !ok {
-		return echo.NewHTTPError(http.StatusNotFound, "provider not found")
+	p, err := h.r.Get(id)
+	if err != nil {
+		return echo.ErrNotFound
 	}
-
-	p, ok := pr.(*provider.HTTPProvider)
-	assert.Assert(ok, "found unexpected type in providers map")
 
 	data, err := p.Run(input)
 	if err != nil {
@@ -89,7 +100,7 @@ func getProviderRun(c echo.Context) error {
 	return c.Blob(http.StatusOK, p.MimeType(), data)
 }
 
-func getProviderSchema(c echo.Context) error {
+func (h *ProviderHandler) getProviderSchema(c echo.Context) error {
 	schema := jsonschema.FromStruct[provider.HTTPProvider]()
 	return c.JSON(http.StatusOK, schema)
 }

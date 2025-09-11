@@ -22,6 +22,7 @@ var Cfg *Config
 type Config struct {
 	IsDev     bool
 	Paths     []string
+	Libraries sync.Map
 	Providers sync.Map
 }
 
@@ -48,7 +49,7 @@ func (cfg *Config) GetFiles(subdir string, fn fs.WalkDirFunc) error {
 		basePath := filepath.Join(d, subdir)
 
 		err := filepath.WalkDir(basePath, fn)
-		errors.Join(errs, yerr.WithStackf("walking dir \"%s\": %w", d, err))
+		errors.Join(errs, yerr.WithStackf("walking dir %q: %w", d, err))
 	}
 
 	return errs
@@ -62,7 +63,7 @@ func (cfg *Config) GetFile(subpath string) (string, error) {
 		}
 	}
 
-	return "", yerr.WithStackf("no config file \"%s\" found", subpath)
+	return "", yerr.WithStackf("no config file %q found", subpath)
 }
 
 func (cfg *Config) StoreFile(subpath string, r io.Reader) (ferr error) {
@@ -70,24 +71,24 @@ func (cfg *Config) StoreFile(subpath string, r io.Reader) (ferr error) {
 		path := filepath.Join(d, subpath)
 		err := os.MkdirAll(filepath.Dir(path), 0700)
 		if err != nil {
-			return yerr.WithStackf("couldn't create required dir \"%s\": %w", d, err)
+			return yerr.WithStackf("couldn't create required dir %q: %w", d, err)
 		}
 
 		f, err := os.Create(path)
 		if err != nil {
-			return yerr.WithStackf("couldn't create file \"%s\": %w", path, err)
+			return yerr.WithStackf("couldn't create file %q: %w", path, err)
 		}
 		defer func() {
 			if err := f.Close(); err != nil {
 				ferr = errors.Join(
 					ferr,
-					yerr.WithStackf("couldn't close file \"%s\": %w", path, err),
+					yerr.WithStackf("couldn't close file %q: %w", path, err),
 				)
 			}
 		}()
 
 		if _, err = io.Copy(f, r); err != nil {
-			return yerr.WithStackf("couldn't write to file \"%s\": %w", path, err)
+			return yerr.WithStackf("couldn't write to file %q: %w", path, err)
 		}
 		break
 	}
