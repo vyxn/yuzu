@@ -32,16 +32,16 @@
     },
     {
       "method": "GET",
-      "url": "%baseUrl%/chapters/%seriesId%",
+      "url": "%baseUrl%/manga/%seriesId%/chapters",
       "responseType": "json",
       "cache": true,
       "params": {
         "filter[number]": "%chapter%"
       },
       "result": {
-        "%chapterTitle%": "$.data.attributes.canonicalTitle",
-        "%chapterNumber%": "$.data.attributes.number",
-        "%chapterDescription%": "$.data.attributes.description"
+        "%chapterTitle%": "$.data[0].attributes.canonicalTitle",
+        "%chapterNumber%": "$.data[0].attributes.number",
+        "%chapterDescription%": "$.data[0].attributes.description"
       }
     }
   ],
