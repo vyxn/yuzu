@@ -48,18 +48,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	libRepo, err := repository.NewFileLibraryRepository(
+	provRepo, err := repository.NewFileProviderRepository(
 		ctx,
-		"libraries",
+		"providers",
 		config.Cfg.Paths,
 	)
 	if err != nil {
 		panic(err)
 	}
-	provRepo, err := repository.NewFileProviderRepository(
+	libRepo, err := repository.NewFileLibraryRepository(
 		ctx,
-		"providers",
+		"libraries",
 		config.Cfg.Paths,
+		provRepo,
 	)
 	if err != nil {
 		panic(err)

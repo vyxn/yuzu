@@ -16,5 +16,5 @@ func SetupRoutes(e *echo.Echo,
 	registerStatic(e)
 	registerDebug(e)
 	registerProvider(e, pr)
-	registerLibrary(e, r)
+	registerLibrary(e, r, pr)
 }

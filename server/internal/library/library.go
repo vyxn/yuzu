@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
+	"github.com/vyxn/yuzu/internal/provider"
 
 	"github.com/robfig/cron/v3"
 	// "os"
@@ -21,19 +22,29 @@ import (
 // var re = regexp.MustCompile(`(?i)^.*?(?:chapter|ch|c)?\s?(\d+).*\.cbz$`)
 
 type Library struct {
-	Id        string    `json:"-"`
-	Path      string    `json:"path"`
-	Selectors Selectors `json:"selectors"`
-	Jobs      []*Job    `json:"jobs"`
+	Id             string                  `json:"-"`
+	Path           string                  `json:"path"`
+	Selectors      Selectors               `json:"selectors"`
+	Jobs           []*Job                  `json:"jobs"`
+	providerFinder provider.ProviderFinder `json:"-"`
 }
 
-func NewLibrary(id string, r io.Reader) (*Library, error) {
+func NewLibrary(
+	id string,
+	r io.Reader,
+	provFinder provider.ProviderFinder,
+) (*Library, error) {
 	var l Library
 	d := json.NewDecoder(r)
 	if err := d.Decode(&l); err != nil {
 		return nil, yerr.WithStackf("unmarshaling library %q: %w", id, err)
 	}
 	l.Id = id
+	l.providerFinder = provFinder
+
+	for _, j := range l.Jobs {
+		j.library = &l
+	}
 
 	return &l, nil
 }

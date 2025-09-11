@@ -8,6 +8,10 @@ import (
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 )
 
+type ProviderFinder interface {
+	Get(id string) (Provider, error)
+}
+
 type Provider interface {
 	ID() string
 	ClearID()

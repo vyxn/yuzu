@@ -43,6 +43,11 @@ func (h *PrettyHandler) Handle(ctx context.Context, r slog.Record) error {
 		return true
 	})
 	for k, v := range fields {
+		if errVal, ok := v.(error); ok {
+			fields[k] = errVal.Error()
+			continue
+		}
+
 		if s, ok := v.(string); ok {
 			if decoded, err := url.QueryUnescape(s); err == nil {
 				fields[k] = decoded

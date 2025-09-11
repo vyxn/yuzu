@@ -17,11 +17,15 @@ import (
 	"github.com/vyxn/yuzu/internal/library"
 	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
+	"github.com/vyxn/yuzu/internal/provider"
 )
 
 var allowedExtensions = []string{".json"}
 
-func NewLibraryFromPath(path string) (lib *library.Library, ferr error) {
+func NewLibraryFromPath(
+	path string,
+	provFinder provider.ProviderFinder,
+) (lib *library.Library, ferr error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, yerr.WithStackf("opening library %q: %v", path, err)
@@ -36,7 +40,7 @@ func NewLibraryFromPath(path string) (lib *library.Library, ferr error) {
 	}()
 
 	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	l, err := library.NewLibrary(id, file)
+	l, err := library.NewLibrary(id, file, provFinder)
 	if err != nil {
 		return nil, yerr.WithStackf("unmarshaling library %q: %w", path, err)
 	}
@@ -50,12 +54,14 @@ type FileLibraryRepository struct {
 	libraries   sync.Map
 	paths       sync.Map
 	idToPath    sync.Map
+	provFinder  provider.ProviderFinder
 }
 
 func NewFileLibraryRepository(
 	ctx context.Context,
 	subdir string,
 	configPaths []string,
+	provFinder provider.ProviderFinder,
 ) (Repository[*library.Library, string], error) {
 	r := &FileLibraryRepository{
 		subdir:      subdir,
@@ -63,6 +69,7 @@ func NewFileLibraryRepository(
 		libraries:   sync.Map{},
 		paths:       sync.Map{},
 		idToPath:    sync.Map{},
+		provFinder:  provFinder,
 	}
 
 	err := r.loadAll()
@@ -110,7 +117,7 @@ func (r *FileLibraryRepository) load(path string) {
 		return
 	}
 
-	lib, err := NewLibraryFromPath(path)
+	lib, err := NewLibraryFromPath(path, r.provFinder)
 	if err != nil {
 		slog.Warn(
 			"skipping library",

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/vyxn/yuzu/internal/library"
+	"github.com/vyxn/yuzu/internal/provider"
 	"github.com/vyxn/yuzu/internal/repository"
 
 	"github.com/labstack/echo/v4"
@@ -15,8 +16,9 @@ import (
 func registerLibrary(
 	e *echo.Echo,
 	r repository.Repository[*library.Library, string],
+	pr repository.Repository[provider.Provider, string],
 ) {
-	h := NewLibraryHandler(r)
+	h := NewLibraryHandler(r, pr)
 
 	// e.GET("/lib", lib)
 	e.GET("/libraries", h.getLibraries)
@@ -30,13 +32,15 @@ func registerLibrary(
 }
 
 type LibraryHandler struct {
-	r repository.Repository[*library.Library, string]
+	r  repository.Repository[*library.Library, string]
+	pr repository.Repository[provider.Provider, string]
 }
 
 func NewLibraryHandler(
 	r repository.Repository[*library.Library, string],
+	pr repository.Repository[provider.Provider, string],
 ) *LibraryHandler {
-	return &LibraryHandler{r: r}
+	return &LibraryHandler{r: r, pr: pr}
 }
 
 func (h *LibraryHandler) getLibraries(c echo.Context) error {
@@ -62,7 +66,7 @@ func (h *LibraryHandler) getLibrary(c echo.Context) error {
 func (h *LibraryHandler) putLibrary(c echo.Context) error {
 	id := c.Param("id")
 
-	lib, err := library.NewLibrary(id, c.Request().Body)
+	lib, err := library.NewLibrary(id, c.Request().Body, h.pr)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "parsing library").
 			SetInternal(err)

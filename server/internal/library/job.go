@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	// "sync"
+	"sync"
 	"time"
-
-	// "github.com/vyxn/yuzu/internal/config"
 
 	"github.com/robfig/cron/v3"
 )
@@ -57,21 +55,52 @@ func (j *Job) Next(t time.Time) time.Time {
 func (j *Job) Run() {
 	slog.Info("executing job", slog.String("library", j.library.Id))
 
-	// selections := j.library.Select()
-	// wg := sync.WaitGroup{}
-	// for _, provider := range j.Providers {
-	// 	prov, ok := config.Cfg.Providers.Load(provider.ID)
-	//
-	// 	wg.Add(1)
-	// 	go func() {
-	// 		defer wg.Done()
-	//
-	// 		for _, selection := range selections {
-	//
-	// 		}
-	// 	}()
-	// }
-	// wg.Wait()
+	selections := j.library.Select()
+	wg := sync.WaitGroup{}
+	for _, provider := range j.Providers {
+		prov, err := j.library.providerFinder.Get(provider.ID)
+		if err != nil {
+			slog.Error(
+				"running job",
+				slog.String("library", j.library.Id),
+				slog.Any("error", err),
+			)
+			continue
+		}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			for _, selection := range selections {
+				if selection.IsDir {
+					continue
+				}
+
+				inputs := map[string]string{}
+				for k, pi := range provider.Inputs {
+					v, ok := selection.Env[pi]
+					if !ok {
+						continue
+					}
+
+					inputs[k] = v
+				}
+
+				output, err := prov.Run(inputs)
+				if err != nil {
+					slog.Error(
+						"running job",
+						slog.String("library", j.library.Id),
+						slog.Any("error", err),
+					)
+				}
+
+				slog.Info("job output", slog.String("output", string(output)))
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 // func Process(dir string) error {

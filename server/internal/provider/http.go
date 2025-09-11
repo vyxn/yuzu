@@ -18,6 +18,7 @@ import (
 
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/utils"
+	"golang.org/x/time/rate"
 
 	"github.com/AsaiYusuke/jsonpath/v2"
 	"github.com/goccy/go-yaml"
@@ -28,12 +29,15 @@ import (
 type HTTPProvider struct {
 	Id        string            `json:"id,omitempty"      jsonschema:"-"`
 	Type      string            `json:"type"              jsonschema:"required,enum=http"`
+	Limits    *RateLimits       `json:"limits,omitempty"  jsonschema:""`
+	Retry     *Retry            `json:"retry,omitempty"   jsonschema:""`
 	Inputs    map[string]string `json:"inputs"            jsonschema:"required,minProperties=1"`
 	Envs      map[string]string `json:"envs,omitempty"    jsonschema:""`
 	Vars      map[string]string `json:"vars,omitempty"    jsonschema:""`
 	Headers   map[string]string `json:"headers,omitempty" jsonschema:""`
 	Endpoints []Endpoint        `json:"endpoints"         jsonschema:"required"`
 	Output    Output            `json:"output"            jsonschema:"required"`
+	client    *APIClient        `json:"-"                 jsonschema:"-"`
 }
 
 type Endpoint struct {
@@ -53,6 +57,17 @@ type Output struct {
 	Content    map[string]any     `json:"content" jsonschema:"required"`
 	JSONSchema *jsonschema.Schema `json:"-"       jsonschema:"-"`
 	XMLSchema  *xmlparser.Schema  `json:"-"       jsonschema:"-"`
+}
+
+type RateLimits struct {
+	RequestsPerSecond float64       `json:"requestsPerSecond,omitempty"`
+	Burst             int           `json:"burst,omitempty"`
+	MinInterval       time.Duration `json:"minInterval,omitempty"`
+}
+
+type Retry struct {
+	MaxRetries uint          `json:"maxRetries"`
+	Cooldown   time.Duration `json:"cooldown"`
 }
 
 func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
@@ -120,6 +135,31 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 		}
 	}
 
+	rateLimit := rate.Every(time.Second)
+	burst := 1
+	if provider.Limits != nil {
+		if provider.Limits.RequestsPerSecond != 0 {
+			rateLimit = rate.Limit(provider.Limits.RequestsPerSecond)
+		}
+		if provider.Limits.Burst != 0 {
+			burst = provider.Limits.Burst
+		}
+	}
+	limiter := rate.NewLimiter(rateLimit, burst)
+
+	maxRetry := uint(1)
+	cooldown := 2 * time.Second
+	if provider.Retry != nil {
+		if provider.Retry.MaxRetries != 0 {
+			maxRetry = provider.Retry.MaxRetries
+		}
+		if provider.Retry.Cooldown != 0 {
+			cooldown = provider.Retry.Cooldown
+		}
+	}
+
+	provider.client = NewAPIClient(limiter, maxRetry, cooldown)
+
 	return &provider, nil
 }
 
@@ -158,22 +198,23 @@ func (p *HTTPProvider) Run(inputs map[string]string) ([]byte, error) {
 	slog.Info("runEnv", slog.Any("", runEnv))
 
 	ctx := context.Background()
-	client := &http.Client{Timeout: 10 * time.Second}
 	for _, e := range p.Endpoints {
 		u, err := url.Parse(getFromRunEnv(runEnv, e.URL))
 		if err != nil {
 			return nil, yerr.WithStackf("parsing url <%s> -> <%s>: %w", e.URL, u, err)
 		}
-		slog.Info("calling endpoint",
-			slog.String("url", u.String()),
-			slog.Any("runEnv", runEnv),
-		)
 
 		q := u.Query()
 		for k, v := range e.Params {
 			q.Add(k, getFromRunEnv(runEnv, v))
 		}
 		u.RawQuery = q.Encode()
+
+		slog.Info(
+			"calling endpoint",
+			slog.String("url", u.String()),
+			slog.Any("runEnv", runEnv),
+		)
 
 		r, err := http.NewRequestWithContext(ctx, e.Method, u.String(), nil)
 		if err != nil {
@@ -187,9 +228,14 @@ func (p *HTTPProvider) Run(inputs map[string]string) ([]byte, error) {
 			r.Header.Add(k, getFromRunEnv(runEnv, v))
 		}
 
-		resp, err := client.Do(r)
+		resp, err := p.client.Do(r)
 		if err != nil {
-			return nil, yerr.WithStackf("fetching <%s>: %w", u.String(), err)
+			return nil, yerr.WithStackf(
+				"fetching %+v %q: %w",
+				resp,
+				u.String(),
+				err,
+			)
 		}
 		defer resp.Body.Close()
 
