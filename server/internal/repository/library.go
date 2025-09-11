@@ -36,15 +36,12 @@ func NewLibraryFromPath(path string) (lib *library.Library, ferr error) {
 	}()
 
 	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	library.NewLibrary(id, file)
-
-	var l library.Library
-	d := json.NewDecoder(file)
-	if err := d.Decode(&l); err != nil {
+	l, err := library.NewLibrary(id, file)
+	if err != nil {
 		return nil, yerr.WithStackf("unmarshaling library %q: %w", path, err)
 	}
 
-	return &l, nil
+	return l, nil
 }
 
 type FileLibraryRepository struct {
