@@ -4,24 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"maps"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/utils"
 
-	"github.com/AsaiYusuke/jsonpath/v2"
 	"github.com/goccy/go-yaml"
 	"github.com/kaptinlin/jsonschema"
+	"github.com/maypok86/otter/v2"
+	"github.com/maypok86/otter/v2/stats"
 	xmlparser "github.com/moolekkari/validatexml-go"
 	"golang.org/x/time/rate"
 )
@@ -33,27 +31,17 @@ const defaultCooldown = 2 * time.Second
 var defaultRateLimit = rate.Every(time.Second)
 
 type HTTPProvider struct {
-	Id        string            `json:"id,omitempty"      jsonschema:"-"`
-	Type      string            `json:"type"              jsonschema:"required,enum=http"`
-	HTTP      *HTTP             `json:"http,omitempty"    jsonschema:""`
-	Inputs    map[string]string `json:"inputs"            jsonschema:"required,minProperties=1"`
-	Envs      map[string]string `json:"envs,omitempty"    jsonschema:""`
-	Vars      map[string]string `json:"vars,omitempty"    jsonschema:""`
-	Headers   map[string]string `json:"headers,omitempty" jsonschema:""`
-	Endpoints []Endpoint        `json:"endpoints"         jsonschema:"required"`
-	Output    Output            `json:"output"            jsonschema:"required"`
-	client    *APIClient        `json:"-"                 jsonschema:"-"`
-}
-
-type Endpoint struct {
-	Method       string            `json:"method"                 jsonschema:"required,enum=GET,POST,PUT,PATCH,DELETE"`
-	URL          string            `json:"url"                    jsonschema:"required,format=uri"`
-	Params       map[string]string `json:"params,omitempty"       jsonschema:""`
-	Headers      map[string]string `json:"headers,omitempty"      jsonschema:""`
-	Body         []string          `json:"body,omitempty"         jsonschema:""`
-	Cache        bool              `json:"cache,omitempty"        jsonschema:""`
-	ResponseType string            `json:"responseType,omitempty" jsonschema:"enum=json,xml,text,binary"`
-	Result       map[string]string `json:"result,omitempty"       jsonschema:""`
+	Id        string                       `json:"id,omitempty"      jsonschema:"-"`
+	Type      string                       `json:"type"              jsonschema:"required,enum=http"`
+	HTTP      *HTTP                        `json:"http,omitempty"    jsonschema:""`
+	Inputs    map[string]string            `json:"inputs"            jsonschema:"required,minProperties=1"`
+	Envs      map[string]string            `json:"envs,omitempty"    jsonschema:""`
+	Vars      map[string]string            `json:"vars,omitempty"    jsonschema:""`
+	Headers   map[string]string            `json:"headers,omitempty" jsonschema:""`
+	Endpoints []*Endpoint                  `json:"endpoints"         jsonschema:"required"`
+	Output    Output                       `json:"output"            jsonschema:"required"`
+	client    *APIClient                   `json:"-"                 jsonschema:"-"`
+	Cache     *otter.Cache[string, []byte] `json:"-"                 jsonschema:"-"`
 }
 
 type Output struct {
@@ -95,6 +83,10 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 	}
 
 	provider.Id = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+
+	for _, e := range provider.Endpoints {
+		e.provider = &provider
+	}
 
 	envs := make(map[string]string)
 	for env, placeholder := range provider.Envs {
@@ -157,6 +149,15 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 	}
 	limiter := rate.NewLimiter(rateLimit, burst)
 
+	cache, err := otter.New(&otter.Options[string, []byte]{
+		MaximumSize:      10_000,
+		InitialCapacity:  1_000,
+		ExpiryCalculator: otter.ExpiryWriting[string, []byte](10 * time.Minute),
+		StatsRecorder:    stats.NewCounter(),
+	})
+	assert.Assert(err == nil, "invalid cache config")
+
+	provider.Cache = cache
 	provider.client = NewAPIClient(limiter, maxRetry, cooldown)
 
 	return &provider, nil
@@ -185,110 +186,28 @@ func (p *HTTPProvider) MimeType() string {
 	}
 }
 
-func (p *HTTPProvider) Run(inputs map[string]string) ([]byte, error) {
-	// Merging os.env and inputs for this run environment values
-	runEnv := make(map[string]string)
-	maps.Copy(runEnv, p.Envs)
-	maps.Copy(runEnv, p.Vars)
-	for k, v := range p.Inputs {
-		runEnv[v] = inputs[k]
-	}
+func (p *HTTPProvider) Run(
+	ctx context.Context,
+	inputs map[string]string,
+) ([]byte, error) {
+	runEnv := p.newRunEnv(inputs)
 
-	slog.Info("runEnv", slog.Any("", runEnv))
-
-	ctx := context.Background()
 	for _, e := range p.Endpoints {
-		u, err := url.Parse(getFromRunEnv(runEnv, e.URL))
-		if err != nil {
-			return nil, yerr.WithStackf("parsing url <%s> -> <%s>: %w", e.URL, u, err)
-		}
-
-		q := u.Query()
-		for k, v := range e.Params {
-			q.Add(k, getFromRunEnv(runEnv, v))
-		}
-		u.RawQuery = q.Encode()
-
-		slog.Info(
-			"calling endpoint",
-			slog.String("url", u.String()),
-			slog.Any("runEnv", runEnv),
-		)
-
-		r, err := http.NewRequestWithContext(ctx, e.Method, u.String(), nil)
-		if err != nil {
-			return nil, yerr.WithStackf("creating request <%s>: %w", u.String(), err)
-		}
-
-		for k, v := range p.Headers {
-			r.Header.Add(k, getFromRunEnv(runEnv, v))
-		}
-		for k, v := range e.Headers {
-			r.Header.Add(k, getFromRunEnv(runEnv, v))
-		}
-
-		resp, err := p.client.Do(r)
-		if err != nil {
-			return nil, yerr.WithStackf(
-				"fetching %+v %q: %w",
-				resp,
-				u.String(),
-				err,
-			)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode < http.StatusOK ||
-			resp.StatusCode >= http.StatusMultipleChoices {
-			b, _ := io.ReadAll(resp.Body)
-			return nil, yerr.WithStackf("bad status <%s>: %s", resp.Status, string(b))
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, yerr.WithStackf("reading response body: %w", err)
-		}
-
-		var result any
-		err = json.Unmarshal(body, &result)
-		if err != nil {
-			return nil, yerr.WithStackf(
-				"unmarshalling endpoint <%s> response: %w\n%s",
-				u.String(),
-				err,
-				string(body),
-			)
-		}
-
-		for k, v := range e.Result {
-			out, err := jsonpath.Retrieve(getFromRunEnv(runEnv, v), result)
-			if err != nil {
-				slog.Info("result value", slog.Any("result", result))
-				return nil, yerr.WithStackf("retrieving jsonpath: %w", err)
-			}
-
-			switch v := out[0].(type) {
-			case string:
-				runEnv[k] = v
-			case float64:
-				runEnv[k] = strconv.FormatFloat(v, 'f', -1, 64)
-			case bool:
-				if v {
-					runEnv[k] = "true"
-				} else {
-					runEnv[k] = "false"
-				}
-			// TODO perhaps this does not make sense if we move to map[string]any
-			case nil:
-				runEnv[k] = ""
-			default:
-				return nil, yerr.WithStackf("retrieved value has unsupported type <%v>: %w", v, err)
-			}
-
+		if err := e.run(ctx, runEnv); err != nil {
+			slog.Error("running endpoint", slog.Any("error", err))
 		}
 	}
 
-	return p.generateOutput(utils.SubstituteKeys(runEnv, p.Output.Content))
+	return p.generateOutput(runEnv.ReplaceAny(p.Output.Content))
+}
+
+func (p *HTTPProvider) newRunEnv(inputs map[string]string) *RunEnv {
+	public := make(map[string]string)
+	maps.Copy(public, p.Vars)
+	for k, v := range p.Inputs {
+		public[v] = inputs[k]
+	}
+	return NewRunEnv(public, p.Envs)
 }
 
 func (p *HTTPProvider) generateOutput(content any) ([]byte, error) {

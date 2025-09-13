@@ -40,6 +40,7 @@
         ""
       ],
       "responseType": "json",
+      "cache": true,
       "result": {
         "%title%": "$.title",
         "%synopsis%": "$.synopsis"

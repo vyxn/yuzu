@@ -1,6 +1,7 @@
 package library
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"github.com/vyxn/yuzu/internal/provider"
 )
 
 type Job struct {
@@ -53,10 +55,11 @@ func (j *Job) Next(t time.Time) time.Time {
 }
 
 func (j *Job) Run() {
+	ctx := context.Background()
+	start := time.Now()
 	slog.Info("executing job", slog.String("library", j.library.Id))
 
-	selections := j.library.Select()
-	wg := sync.WaitGroup{}
+	providers := map[string]provider.Provider{}
 	for _, provider := range j.Providers {
 		prov, err := j.library.providerFinder.Get(provider.ID)
 		if err != nil {
@@ -68,39 +71,77 @@ func (j *Job) Run() {
 			continue
 		}
 
+		providers[provider.ID] = prov
+	}
+
+	selections := j.library.Select()
+	wg := sync.WaitGroup{}
+	for _, selection := range selections {
+		if selection.IsDir {
+			continue
+		}
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			for _, selection := range selections {
-				if selection.IsDir {
+			selectionWg := sync.WaitGroup{}
+			for _, provider := range j.Providers {
+				prov, ok := providers[provider.ID]
+				if !ok {
 					continue
 				}
 
-				inputs := map[string]string{}
-				for k, pi := range provider.Inputs {
-					v, ok := selection.Env[pi]
-					if !ok {
-						continue
+				selectionWg.Add(1)
+				go func() {
+					defer selectionWg.Done()
+
+					inputs := map[string]string{}
+					for k, pi := range provider.Inputs {
+						v, ok := selection.Env[pi]
+						if !ok {
+							continue
+						}
+
+						inputs[k] = v
 					}
 
-					inputs[k] = v
-				}
+					output, err := prov.Run(ctx, inputs)
+					if err != nil {
+						slog.Error(
+							"running job",
+							slog.String("library", j.library.Id),
+							slog.Any("error", err),
+						)
+					}
 
-				output, err := prov.Run(inputs)
-				if err != nil {
-					slog.Error(
-						"running job",
-						slog.String("library", j.library.Id),
-						slog.Any("error", err),
-					)
-				}
-
-				slog.Info("job output", slog.String("output", string(output)))
+					slog.Info("job output", slog.String("output", string(output)))
+				}()
 			}
 
-			slog.Info("job finished", slog.String("library", j.library.Id))
+			selectionWg.Wait()
+
+			// TODO: handle the outputs
+
 		}()
 	}
+
 	wg.Wait()
+
+	for _, p := range providers {
+		c := p.(*provider.HTTPProvider).Cache.Stats()
+		slog.Info(
+			"cache usage",
+			slog.Uint64("hits", c.Hits),
+			slog.Uint64("misses", c.Misses),
+			slog.Float64("hit ration", c.HitRatio()),
+		)
+	}
+
+	elapsed := time.Since(start)
+	slog.Info(
+		"job finished",
+		slog.String("library", j.library.Id),
+		slog.String("took", elapsed.String()),
+	)
 }

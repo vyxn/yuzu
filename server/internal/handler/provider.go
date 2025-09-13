@@ -91,7 +91,7 @@ func (h *ProviderHandler) getProviderRun(c echo.Context) error {
 		return echo.ErrNotFound
 	}
 
-	data, err := p.Run(input)
+	data, err := p.Run(c.Request().Context(), input)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "error while running provider").
 			SetInternal(err)

@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -37,6 +38,10 @@ func (c *APIClient) Do(req *http.Request) (*http.Response, error) {
 			return nil, err
 		}
 
+		slog.Info(
+			fmt.Sprintf("→ c %s %q", req.Method, req.URL),
+			slog.Int("attempt", attempt),
+		)
 		var resp *http.Response
 		resp, err = c.client.Do(req)
 		if err == nil && resp.StatusCode < 500 {

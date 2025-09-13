@@ -91,33 +91,3 @@ func IsURL(s string) bool {
 
 	return true
 }
-
-func Substitute(m map[string]string, compilable string) string {
-	compiled := compilable
-	for pattern, replacement := range m {
-		compiled = strings.ReplaceAll(compiled, pattern, replacement)
-	}
-	return compiled
-}
-
-func SubstituteKeys(m map[string]string, v any) any {
-	switch val := v.(type) {
-	case string:
-		return Substitute(m, val)
-	case map[string]any:
-		out := make(map[string]any, len(val))
-		for k, inner := range val {
-			out[k] = SubstituteKeys(m, inner) // recurse
-		}
-		return out
-	case []any: // also handle slices if needed
-		out := make([]any, len(val))
-		for i, inner := range val {
-			out[i] = SubstituteKeys(m, inner)
-		}
-		return out
-	default:
-		// int, bool, float64, structs, etc.
-		return val
-	}
-}

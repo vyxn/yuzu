@@ -12,9 +12,11 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/kaptinlin/jsonschema v0.4.12
 	github.com/labstack/echo/v4 v4.13.4
+	github.com/maypok86/otter/v2 v2.2.1
 	github.com/moolekkari/validatexml-go v0.1.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/syncthing/notify v0.0.0-20250528144937-c7027d4f7465
+	golang.org/x/time v0.11.0
 )
 
 require (
@@ -45,9 +47,8 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
-	golang.org/x/time v0.11.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	modernc.org/libc v1.37.6 // indirect
 	modernc.org/mathutil v1.6.0 // indirect

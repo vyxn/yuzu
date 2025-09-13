@@ -7,6 +7,9 @@
   "vars": {
     "%baseUrl%": "https://kitsu.io/api/edge"
   },
+  "http": {
+    "requestsPerSecond": 10
+  },
   "endpoints": [
     {
       "method": "GET",

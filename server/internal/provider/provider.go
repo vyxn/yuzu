@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -16,7 +17,7 @@ type Provider interface {
 	ID() string
 	ClearID()
 	MimeType() string
-	Run(map[string]string) ([]byte, error)
+	Run(context.Context, map[string]string) ([]byte, error)
 }
 
 type RawProvider struct {
@@ -44,21 +45,14 @@ func NewProvider(path string, r io.Reader) (Provider, error) {
 		return nil, yerr.WithStackf("unmarshaling provider JSON: %w", err)
 	}
 
-	var prov Provider
-	var err error
 	switch p.Type {
 	case "http":
-		prov, err = newHTTPProvider(path, &p)
-		if err != nil {
-			slog.Warn(
-				"provider not loaded",
-				slog.String("provider", path),
-				slog.Any("reason", err.Error()),
-			)
-		}
+		return newHTTPProvider(path, &p)
 	case "cli":
+		slog.Warn("cli provider not yet implemented")
+		return nil, nil
 	default:
 		slog.Warn("provider type not supported", slog.String("type", p.Type))
+		return nil, nil
 	}
-	return prov, err
 }

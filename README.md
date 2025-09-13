@@ -20,7 +20,7 @@
 - [x] return compiled output value
 - [x] handle comicinfo schema validation
 - [ ] add xpath for xml only APIs
-- [ ] improve generic provider Run()
+- [x] improve generic provider Run()
 - [x] validate expected provider json with a schema, created from our structs
 - [x] add support for yaml output
 - [x] add support for md frontmatter output
@@ -28,6 +28,7 @@
 - [x] allow to delete a provider
 - [x] rate limiting for provider
 - [ ] try if unmarshaling directly from the json schema library works
+- [x] implement caching mechanism for repeated calls
 
 ### Library
 - [x] make basic structure of a library
@@ -41,7 +42,10 @@
 
 ### Job
 - [x] make base flow of a job run
-- [ ] optimize number of provider runs with gorutines
+- [x] optimize number of provider runs with gorutines
+- [ ] job output: to disk file
+- [ ] job output: cbz inclusion
+- [ ] job output: merge multiple provider results
 
 ### Additional Providers
 - [ ] books: goodreads
