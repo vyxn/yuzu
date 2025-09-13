@@ -20,6 +20,7 @@ type Repository[T any, R any] interface {
 	Delete(R) error
 }
 
+// TODO: move this at some point to a file package, or utils package of some sorts
 func Watch(ctx context.Context, root string, load, unload func(path string)) {
 	c := make(chan notify.EventInfo, 1000)
 	defer close(c)
@@ -51,11 +52,17 @@ func Watch(ctx context.Context, root string, load, unload func(path string)) {
 			)
 
 			switch e.Event() {
-			case notify.Create, notify.Write, notify.InCloseWrite, notify.InMovedTo:
+			case notify.Create,
+				notify.Write,
+				notify.InCloseWrite,
+				notify.InMovedTo:
 				pth := e.Path()
 				info, err := os.Stat(pth)
 				if err != nil {
-					slog.Warn("could not get path info", slog.String("path", pth))
+					slog.Warn(
+						"could not get path info",
+						slog.String("path", pth),
+					)
 					continue
 				}
 
@@ -67,7 +74,10 @@ func Watch(ctx context.Context, root string, load, unload func(path string)) {
 				load(pth)
 
 			case notify.Remove, notify.InMovedFrom:
-				if !slices.Contains(allowedExtensions, filepath.Ext(e.Path())) {
+				if !slices.Contains(
+					allowedExtensions,
+					filepath.Ext(e.Path()),
+				) {
 					continue
 				}
 

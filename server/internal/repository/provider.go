@@ -18,24 +18,6 @@ import (
 	"github.com/vyxn/yuzu/internal/provider"
 )
 
-func NewProviderFromPath(path string) (prov provider.Provider, ferr error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, yerr.WithStackf("opening provider %q: %v", path, err)
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			ferr = errors.Join(
-				ferr,
-				yerr.WithStackf("closing file %q: %w", path, err),
-			)
-		}
-	}()
-
-	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	return provider.NewProvider(id, file)
-}
-
 type FileProviderRepository struct {
 	subdir      string
 	idCache     sync.Map
@@ -97,11 +79,12 @@ func (r *FileProviderRepository) load(path string) {
 		return
 	}
 
-	if info.IsDir() || !slices.Contains(allowedExtensions, filepath.Ext(path)) {
+	if info.IsDir() ||
+		!slices.Contains(allowedExtensions, filepath.Ext(path)) {
 		return
 	}
 
-	prov, err := NewProviderFromPath(path)
+	prov, err := newProviderFromPath(path)
 	if err != nil {
 		slog.Warn(
 			"skipping provider",
@@ -115,6 +98,24 @@ func (r *FileProviderRepository) load(path string) {
 	r.idCache.Store(prov.ID(), prov)
 	r.paths.Store(path, prov)
 	r.idToPath.Store(prov.ID(), path)
+}
+
+func newProviderFromPath(path string) (prov provider.Provider, ferr error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, yerr.WithStackf("opening provider %q: %v", path, err)
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			ferr = errors.Join(
+				ferr,
+				yerr.WithStackf("closing file %q: %w", path, err),
+			)
+		}
+	}()
+
+	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	return provider.NewProvider(id, file)
 }
 
 func (r *FileProviderRepository) unload(path string) {

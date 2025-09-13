@@ -10,6 +10,7 @@ import (
 	"github.com/vyxn/yuzu/internal/provider"
 	"github.com/vyxn/yuzu/internal/repository"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -17,8 +18,9 @@ func registerLibrary(
 	e *echo.Echo,
 	r repository.Repository[*library.Library, string],
 	pr repository.Repository[provider.Provider, string],
+	jrr repository.Repository[*library.JobRun, uuid.UUID],
 ) {
-	h := NewLibraryHandler(r, pr)
+	h := NewLibraryHandler(r, pr, jrr)
 
 	// e.GET("/lib", lib)
 	e.GET("/libraries", h.getLibraries)
@@ -32,15 +34,17 @@ func registerLibrary(
 }
 
 type LibraryHandler struct {
-	r  repository.Repository[*library.Library, string]
-	pr repository.Repository[provider.Provider, string]
+	r   repository.Repository[*library.Library, string]
+	pr  repository.Repository[provider.Provider, string]
+	jrr repository.Repository[*library.JobRun, uuid.UUID]
 }
 
 func NewLibraryHandler(
 	r repository.Repository[*library.Library, string],
 	pr repository.Repository[provider.Provider, string],
+	jrr repository.Repository[*library.JobRun, uuid.UUID],
 ) *LibraryHandler {
-	return &LibraryHandler{r: r, pr: pr}
+	return &LibraryHandler{r: r, pr: pr, jrr: jrr}
 }
 
 func (h *LibraryHandler) getLibraries(c echo.Context) error {
@@ -66,7 +70,7 @@ func (h *LibraryHandler) getLibrary(c echo.Context) error {
 func (h *LibraryHandler) putLibrary(c echo.Context) error {
 	id := c.Param("id")
 
-	lib, err := library.NewLibrary(id, c.Request().Body, h.pr)
+	lib, err := library.NewLibrary(id, c.Request().Body, h.pr, h.jrr)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "parsing library").
 			SetInternal(err)

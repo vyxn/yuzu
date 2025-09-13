@@ -44,7 +44,11 @@ func Get(
 	if resp.StatusCode < http.StatusOK ||
 		resp.StatusCode >= http.StatusMultipleChoices {
 		b, _ := io.ReadAll(resp.Body)
-		return nil, yerr.WithStackf("bad status <%s>: %s", resp.Status, string(b))
+		return nil, yerr.WithStackf(
+			"bad status <%s>: %s",
+			resp.Status,
+			string(b),
+		)
 	}
 
 	body, err := io.ReadAll(resp.Body)

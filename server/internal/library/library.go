@@ -27,12 +27,14 @@ type Library struct {
 	Selectors      Selectors               `json:"selectors"`
 	Jobs           []*Job                  `json:"jobs"`
 	providerFinder provider.ProviderFinder `json:"-"`
+	jobRunSaver    JobRunSaver             `json:"-"`
 }
 
 func NewLibrary(
 	id string,
 	r io.Reader,
 	provFinder provider.ProviderFinder,
+	jobRunSaver JobRunSaver,
 ) (*Library, error) {
 	var l Library
 	d := json.NewDecoder(r)
@@ -41,6 +43,7 @@ func NewLibrary(
 	}
 	l.Id = id
 	l.providerFinder = provFinder
+	l.jobRunSaver = jobRunSaver
 
 	for _, j := range l.Jobs {
 		j.library = &l
@@ -52,20 +55,23 @@ func NewLibrary(
 func (l *Library) Select() []*Selection {
 	res := []*Selection{}
 
-	filepath.WalkDir(l.Path, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
+	filepath.WalkDir(
+		l.Path,
+		func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+
+			if d.IsDir() {
+				slog.Info("walking", slog.String("path", path))
+			}
+
+			if sel := l.Selectors.run(d.IsDir(), path); sel != nil {
+				res = append(res, sel)
+			}
 			return nil
-		}
-
-		if d.IsDir() {
-			slog.Info("walking", slog.String("path", path))
-		}
-
-		if sel := l.Selectors.run(d.IsDir(), path); sel != nil {
-			res = append(res, sel)
-		}
-		return nil
-	})
+		},
+	)
 
 	return res
 }

@@ -46,6 +46,11 @@
 - [ ] job output: to disk file
 - [ ] job output: cbz inclusion
 - [ ] job output: merge multiple provider results
+- [ ] job executions repository 
+- [ ] job run endpoints
+- [ ] store job runs in SQLite
+- [ ] subJobs for each selected?
+  - [ ] mark as pending/retry needed?
 
 ### Additional Providers
 - [ ] books: goodreads

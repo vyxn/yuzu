@@ -3,6 +3,7 @@ package library
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -56,8 +57,33 @@ func (j *Job) Next(t time.Time) time.Time {
 
 func (j *Job) Run() {
 	ctx := context.Background()
-	start := time.Now()
 	slog.Info("executing job", slog.String("library", j.library.Id))
+	jobRun, err := NewJobRun(j)
+	if err != nil {
+		slog.Error("", slog.Any("error", err))
+		return
+	}
+
+	err = j.library.jobRunSaver.Save(jobRun)
+	if err != nil {
+		slog.Error("", slog.Any("error", err))
+		return
+	}
+
+	var jobRunError error
+	var jobRunFinalStatus = Crashed
+	defer func() {
+		jobRun.EndedAt = time.Now()
+		jobRun.Status = jobRunFinalStatus
+		jobRun.Errors = jobRunError
+		slog.Info("jobRun finished",
+			slog.Any("jobRun", jobRun),
+			slog.String("library", jobRun.LibraryID),
+			slog.String("took", jobRun.Elapsed().String()),
+		)
+	}()
+
+	jobRun.Status = Running
 
 	providers := map[string]provider.Provider{}
 	for _, provider := range j.Providers {
@@ -68,6 +94,8 @@ func (j *Job) Run() {
 				slog.String("library", j.library.Id),
 				slog.Any("error", err),
 			)
+			jobRunError = errors.Join(jobRunError, err)
+			jobRunFinalStatus = Crashed
 			continue
 		}
 
@@ -113,9 +141,14 @@ func (j *Job) Run() {
 							slog.String("library", j.library.Id),
 							slog.Any("error", err),
 						)
+						jobRunError = errors.Join(jobRunError, err)
+						jobRunFinalStatus = Crashed
 					}
 
-					slog.Info("job output", slog.String("output", string(output)))
+					slog.Info(
+						"job output",
+						slog.String("output", string(output)),
+					)
 				}()
 			}
 
@@ -138,10 +171,5 @@ func (j *Job) Run() {
 		)
 	}
 
-	elapsed := time.Since(start)
-	slog.Info(
-		"job finished",
-		slog.String("library", j.library.Id),
-		slog.String("took", elapsed.String()),
-	)
+	jobRunFinalStatus = Finished
 }

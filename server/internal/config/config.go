@@ -71,7 +71,11 @@ func (cfg *Config) StoreFile(subpath string, r io.Reader) (ferr error) {
 		path := filepath.Join(d, subpath)
 		err := os.MkdirAll(filepath.Dir(path), 0700)
 		if err != nil {
-			return yerr.WithStackf("couldn't create required dir %q: %w", d, err)
+			return yerr.WithStackf(
+				"couldn't create required dir %q: %w",
+				d,
+				err,
+			)
 		}
 
 		f, err := os.Create(path)

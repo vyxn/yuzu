@@ -74,7 +74,10 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 				slog.String("message", message),
 			)
 		}
-		return nil, yerr.WithStackf("validating provider json schema: %s", errs)
+		return nil, yerr.WithStackf(
+			"validating provider json schema: %s",
+			errs,
+		)
 	}
 
 	var provider HTTPProvider
@@ -230,11 +233,18 @@ func (p *HTTPProvider) generateOutput(content any) ([]byte, error) {
 		data, dataErr = json.Marshal(content)
 
 	default:
-		return nil, yerr.WithStackf("output type %s not supported", p.Output.Type)
+		return nil, yerr.WithStackf(
+			"output type %s not supported",
+			p.Output.Type,
+		)
 	}
 
 	if err != nil {
-		return nil, yerr.WithStackf("marshalling to %s: %w", p.Output.Type, err)
+		return nil, yerr.WithStackf(
+			"marshalling to %s: %w",
+			p.Output.Type,
+			err,
+		)
 	}
 
 	if dataErr != nil {

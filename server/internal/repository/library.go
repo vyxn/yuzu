@@ -22,32 +22,6 @@ import (
 
 var allowedExtensions = []string{".json"}
 
-func NewLibraryFromPath(
-	path string,
-	provFinder provider.ProviderFinder,
-) (lib *library.Library, ferr error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, yerr.WithStackf("opening library %q: %v", path, err)
-	}
-	defer func() {
-		if err := file.Close(); err != nil {
-			ferr = errors.Join(
-				ferr,
-				yerr.WithStackf("closing file %q: %w", path, err),
-			)
-		}
-	}()
-
-	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	l, err := library.NewLibrary(id, file, provFinder)
-	if err != nil {
-		return nil, yerr.WithStackf("unmarshaling library %q: %w", path, err)
-	}
-
-	return l, nil
-}
-
 type FileLibraryRepository struct {
 	subdir      string
 	configPaths []string
@@ -55,6 +29,7 @@ type FileLibraryRepository struct {
 	paths       sync.Map
 	idToPath    sync.Map
 	provFinder  provider.ProviderFinder
+	jobRunSaver library.JobRunSaver
 }
 
 func NewFileLibraryRepository(
@@ -62,6 +37,7 @@ func NewFileLibraryRepository(
 	subdir string,
 	configPaths []string,
 	provFinder provider.ProviderFinder,
+	jobRunSaver library.JobRunSaver,
 ) (Repository[*library.Library, string], error) {
 	r := &FileLibraryRepository{
 		subdir:      subdir,
@@ -70,6 +46,7 @@ func NewFileLibraryRepository(
 		paths:       sync.Map{},
 		idToPath:    sync.Map{},
 		provFinder:  provFinder,
+		jobRunSaver: jobRunSaver,
 	}
 
 	err := r.loadAll()
@@ -113,11 +90,12 @@ func (r *FileLibraryRepository) load(path string) {
 		return
 	}
 
-	if info.IsDir() || !slices.Contains(allowedExtensions, filepath.Ext(path)) {
+	if info.IsDir() ||
+		!slices.Contains(allowedExtensions, filepath.Ext(path)) {
 		return
 	}
 
-	lib, err := NewLibraryFromPath(path, r.provFinder)
+	lib, err := newLibraryFromPath(path, r.provFinder, r.jobRunSaver)
 	if err != nil {
 		slog.Warn(
 			"skipping library",
@@ -131,6 +109,33 @@ func (r *FileLibraryRepository) load(path string) {
 	r.libraries.Store(lib.Id, lib)
 	r.paths.Store(path, lib)
 	r.idToPath.Store(lib.Id, path)
+}
+
+func newLibraryFromPath(
+	path string,
+	provFinder provider.ProviderFinder,
+	jobRunSaver library.JobRunSaver,
+) (lib *library.Library, ferr error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, yerr.WithStackf("opening library %q: %v", path, err)
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			ferr = errors.Join(
+				ferr,
+				yerr.WithStackf("closing file %q: %w", path, err),
+			)
+		}
+	}()
+
+	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	l, err := library.NewLibrary(id, file, provFinder, jobRunSaver)
+	if err != nil {
+		return nil, yerr.WithStackf("unmarshaling library %q: %w", path, err)
+	}
+
+	return l, nil
 }
 
 func (r *FileLibraryRepository) unload(path string) {
