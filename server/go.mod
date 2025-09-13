@@ -1,6 +1,6 @@
 module github.com/vyxn/yuzu
 
-go 1.24.4
+go 1.24.7
 
 require (
 	github.com/AsaiYusuke/jsonpath/v2 v2.2.0

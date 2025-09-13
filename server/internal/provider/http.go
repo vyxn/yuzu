@@ -81,6 +81,10 @@ func newHTTPProvider(path string, rp *RawProvider) (*HTTPProvider, error) {
 	}
 
 	var provider HTTPProvider
+
+	// TODO: would be better to unmarshall with the schema, to use schema default
+	// values, but for now this is not working, review after a while.
+	// if err := schema.Unmarshal(&provider, rp.Raw); err != nil {
 	if err := json.Unmarshal(rp.Raw, &provider); err != nil {
 		return nil, yerr.WithStackf("unmarshaling provider JSON: %v", err)
 	}
