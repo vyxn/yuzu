@@ -19,4 +19,6 @@ func SetupRoutes(e *echo.Echo,
 	registerDebug(e)
 	registerProvider(e, pr)
 	registerLibrary(e, r, pr, jrr)
+	registerJobRun(e, jrr)
+
 }
