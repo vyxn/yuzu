@@ -5,6 +5,7 @@
       "type": "dir",
       "regex": ".*/([^/]+)/?$",
       "captures": {
+        "%dir%": 0,
         "%series%": 1
       }
     },
@@ -19,12 +20,21 @@
   "jobs": [
     {
       "schedule": "* 0 * * *",
+      "output": {
+        "id": "comicinfo",
+        "path": "%dir%/%chapter%.ComicInfo.xml"
+      },
       "providers": [
         {
           "id": "myanimelist",
           "inputs": {
             "series": "%series%",
             "chapter": "%chapter%"
+          },
+          "output": {
+            "ComicInfo": {
+              "Summary": 0
+            }
           }
         }
       ]

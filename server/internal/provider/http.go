@@ -8,7 +8,6 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/utils"
 
-	"github.com/goccy/go-yaml"
 	"github.com/kaptinlin/jsonschema"
 	"github.com/maypok86/otter/v2"
 	"github.com/maypok86/otter/v2/stats"
@@ -196,16 +194,17 @@ func (p *HTTPProvider) MimeType() string {
 func (p *HTTPProvider) Run(
 	ctx context.Context,
 	inputs map[string]string,
-) ([]byte, error) {
+) (any, error) {
 	runEnv := p.newRunEnv(inputs)
 
 	for _, e := range p.Endpoints {
 		if err := e.run(ctx, runEnv); err != nil {
 			slog.Error("running endpoint", slog.Any("error", err))
+			return nil, err
 		}
 	}
 
-	return p.generateOutput(runEnv.ReplaceAny(p.Output.Content))
+	return runEnv.ReplaceAny(p.Output.Content), nil
 }
 
 func (p *HTTPProvider) newRunEnv(inputs map[string]string) *RunEnv {
@@ -215,101 +214,4 @@ func (p *HTTPProvider) newRunEnv(inputs map[string]string) *RunEnv {
 		public[v] = inputs[k]
 	}
 	return NewRunEnv(public, p.Envs)
-}
-
-func (p *HTTPProvider) generateOutput(content any) ([]byte, error) {
-	var output []byte
-	var err error
-	var data []byte
-	var dataErr error
-
-	switch p.Output.Type {
-	case "json":
-		output, err = json.MarshalIndent(content, "", "  ")
-	case "md":
-		output, err = yaml.MarshalWithOptions(content, yaml.Indent(2))
-		output = slices.Concat([]byte("---\n"), output, []byte("\n---\n"))
-		data, dataErr = json.Marshal(content)
-	case "xml":
-		output, err = MapToXML(content)
-	case "yaml":
-		output, err = yaml.MarshalWithOptions(content, yaml.Indent(2))
-		data, dataErr = json.Marshal(content)
-
-	default:
-		return nil, yerr.WithStackf(
-			"output type %s not supported",
-			p.Output.Type,
-		)
-	}
-
-	if err != nil {
-		return nil, yerr.WithStackf(
-			"marshalling to %s: %w",
-			p.Output.Type,
-			err,
-		)
-	}
-
-	if dataErr != nil {
-		return nil, yerr.WithStackf(
-			"marshalling data to %s: %w",
-			p.Output.Type,
-			dataErr,
-		)
-	}
-
-	if data == nil {
-		data = output
-	}
-	if err := p.validateOutputSchema(data); err != nil {
-		return nil, err
-	}
-
-	return output, nil
-}
-
-func (p *HTTPProvider) validateOutputSchema(data []byte) error {
-	if p.Output.Schema == "" {
-		return nil
-	}
-
-	switch p.Output.Type {
-	case "json", "md", "yaml":
-		res := p.Output.JSONSchema.ValidateJSON(data)
-
-		if !res.IsValid() {
-			errs := ""
-			for path, message := range res.GetDetailedErrors() {
-				errs += fmt.Sprintf("\n- %s: %s", path, message)
-				slog.Info(
-					"validation result",
-					slog.String("path", path),
-					slog.String("message", message),
-				)
-
-			}
-			return yerr.WithStackf("validating json output: %s", errs)
-		}
-
-		return nil
-	case "xml":
-		doc, err := xmlparser.Parse(data)
-		if err != nil {
-			return yerr.WithStackf("parsing output data: %w", err)
-		}
-
-		return p.Output.XMLSchema.Validate(doc)
-	default:
-		return nil
-	}
-}
-
-func getFromRunEnv(values map[string]string, compilable string) string {
-	compiled := compilable
-	for k, v := range values {
-		compiled = strings.ReplaceAll(compiled, k, v)
-	}
-
-	return compiled
 }

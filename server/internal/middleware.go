@@ -59,7 +59,7 @@ func mLogger(next echo.HandlerFunc) echo.HandlerFunc {
 
 		res := c.Response()
 		slog.Info(
-			fmt.Sprintf("← h %s %s --- took ~ %s", req.Method, req.URL, took),
+			fmt.Sprintf("⇄ h %s %s --- took ~ %s", req.Method, req.URL, took),
 			slog.String("request_id", id),
 			slog.Int("status", res.Status),
 			slog.Duration("duration", took),

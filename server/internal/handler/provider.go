@@ -20,7 +20,7 @@ func registerProvider(
 	e.GET("/providers/:id", h.getProvider)
 	e.PUT("/providers/:id", h.putProvider)
 	e.DELETE("/providers/:id", h.deleteProvider)
-	e.GET("/providers/:id/run", h.getProviderRun)
+	// e.GET("/providers/:id/run", h.getProviderRun)
 	e.GET("/schemas/providers/http", h.getProviderSchema)
 }
 
@@ -82,23 +82,23 @@ func (h *ProviderHandler) deleteProvider(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *ProviderHandler) getProviderRun(c echo.Context) error {
-	id := c.Param("id")
-	input := queryToMap(c.QueryParams(), ",")
-
-	p, err := h.r.Get(id)
-	if err != nil {
-		return echo.ErrNotFound
-	}
-
-	data, err := p.Run(c.Request().Context(), input)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "error while running provider").
-			SetInternal(err)
-	}
-
-	return c.Blob(http.StatusOK, p.MimeType(), data)
-}
+// func (h *ProviderHandler) getProviderRun(c echo.Context) error {
+// 	id := c.Param("id")
+// 	input := queryToMap(c.QueryParams(), ",")
+//
+// 	p, err := h.r.Get(id)
+// 	if err != nil {
+// 		return echo.ErrNotFound
+// 	}
+//
+// 	data, err := p.Run(c.Request().Context(), input)
+// 	if err != nil {
+// 		return echo.NewHTTPError(http.StatusBadRequest, "error while running provider").
+// 			SetInternal(err)
+// 	}
+//
+// 	return c.Blob(http.StatusOK, p.MimeType(), data)
+// }
 
 func (h *ProviderHandler) getProviderSchema(c echo.Context) error {
 	schema := jsonschema.FromStruct[provider.HTTPProvider]()

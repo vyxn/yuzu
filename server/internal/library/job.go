@@ -9,13 +9,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/robfig/cron/v3"
 	"github.com/vyxn/yuzu/internal/provider"
+
+	"github.com/robfig/cron/v3"
 )
 
 type Job struct {
 	Schedule  string        `json:"schedule"`
 	schedule  cron.Schedule `json:"-"`
+	Output    *RawJobOutput `json:"output"`
+	output    JobOutput     `json:"-"`
 	Providers []JobProvider `json:"providers"`
 	library   *Library      `json:"-"`
 }
@@ -113,49 +116,11 @@ func (j *Job) Run() {
 		go func() {
 			defer wg.Done()
 
-			selectionWg := sync.WaitGroup{}
-			for _, provider := range j.Providers {
-				prov, ok := providers[provider.ID]
-				if !ok {
-					continue
-				}
-
-				selectionWg.Add(1)
-				go func() {
-					defer selectionWg.Done()
-
-					inputs := map[string]string{}
-					for k, pi := range provider.Inputs {
-						v, ok := selection.Env[pi]
-						if !ok {
-							continue
-						}
-
-						inputs[k] = v
-					}
-
-					output, err := prov.Run(ctx, inputs)
-					if err != nil {
-						slog.Error(
-							"running job",
-							slog.String("library", j.library.Id),
-							slog.Any("error", err),
-						)
-						jobRunError = errors.Join(jobRunError, err)
-						jobRunFinalStatus = Crashed
-					}
-
-					slog.Info(
-						"job output",
-						slog.String("output", string(output)),
-					)
-				}()
+			if err := j.handleSelected(ctx, providers, selection); err != nil {
+				slog.Error("for selected", slog.Any("error", err))
+				jobRunError = errors.Join(jobRunError, err)
+				jobRunFinalStatus = Crashed
 			}
-
-			selectionWg.Wait()
-
-			// TODO: handle the outputs
-
 		}()
 	}
 
@@ -172,4 +137,85 @@ func (j *Job) Run() {
 	}
 
 	jobRunFinalStatus = Finished
+}
+
+func (j *Job) handleSelected(
+	ctx context.Context,
+	providers map[string]provider.Provider,
+	selection *Selection,
+) error {
+	data, err := j.getProvidersData(ctx, providers, selection)
+	if err != nil {
+		slog.Error(
+			"running providers",
+			slog.String("job", j.library.Id),
+			slog.Any("error", err),
+		)
+	}
+
+	runEnv := provider.NewRunEnv(selection.Env, nil)
+
+	// TODO: handle the outputs
+	return j.output.Run(runEnv, data)
+}
+
+func (j *Job) getProvidersData(
+	ctx context.Context,
+	providers map[string]provider.Provider,
+	selection *Selection,
+) (any, error) {
+	outs := make(chan any, len(j.Providers))
+	errc := make(chan error, len(j.Providers))
+
+	wg := sync.WaitGroup{}
+	for _, provider := range j.Providers {
+		prov, ok := providers[provider.ID]
+		if !ok {
+			continue
+		}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			inputs := map[string]string{}
+			for k, pi := range provider.Inputs {
+				v, ok := selection.Env[pi]
+				if !ok {
+					continue
+				}
+
+				inputs[k] = v
+			}
+
+			output, err := prov.Run(ctx, inputs)
+			if err != nil {
+				errc <- fmt.Errorf("provider %q: %w", prov.ID(), err)
+				return
+			}
+			outs <- output
+
+			// slog.Info(
+			// 	"job output",
+			// 	slog.String("output", string(output)),
+			// )
+		}()
+	}
+
+	wg.Wait()
+	close(outs)
+	close(errc)
+
+	// TODO: merge outputs here
+	var fout any
+	for out := range outs {
+		fout = out
+		break
+	}
+
+	var errs error
+	for err := range errc {
+		errs = errors.Join(errs, err)
+	}
+	return fout, errs
 }

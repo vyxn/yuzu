@@ -17,7 +17,7 @@ type Provider interface {
 	ID() string
 	ClearID()
 	MimeType() string
-	Run(context.Context, map[string]string) ([]byte, error)
+	Run(context.Context, map[string]string) (any, error)
 }
 
 type RawProvider struct {

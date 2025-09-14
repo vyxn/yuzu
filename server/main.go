@@ -57,12 +57,21 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	outputRepo, err := repository.NewFileOutputRepository(
+		ctx,
+		"outputs",
+		config.Cfg.Paths,
+	)
+	if err != nil {
+		panic(err)
+	}
 	libRepo, err := repository.NewFileLibraryRepository(
 		ctx,
 		"libraries",
 		config.Cfg.Paths,
 		provRepo,
 		jobRunRepo,
+		outputRepo,
 	)
 	if err != nil {
 		panic(err)
@@ -80,7 +89,7 @@ func main() {
 
 	internal.SetupMiddleware(e)
 	internal.SetupErrorHandling(e)
-	handler.SetupRoutes(e, libRepo, provRepo, jobRunRepo)
+	handler.SetupRoutes(e, libRepo, provRepo, jobRunRepo, outputRepo)
 
 	// c := cron.New()
 	// libs, err := libRepo.GetAll()

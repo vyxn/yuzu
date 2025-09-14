@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -15,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/vyxn/yuzu/internal/library"
+	"github.com/vyxn/yuzu/internal/output"
 	"github.com/vyxn/yuzu/internal/pkg/assert"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/provider"
@@ -23,13 +23,14 @@ import (
 var allowedExtensions = []string{".json"}
 
 type FileLibraryRepository struct {
-	subdir      string
-	configPaths []string
-	libraries   sync.Map
-	paths       sync.Map
-	idToPath    sync.Map
-	provFinder  provider.ProviderFinder
-	jobRunSaver library.JobRunSaver
+	subdir       string
+	configPaths  []string
+	libraries    sync.Map
+	paths        sync.Map
+	idToPath     sync.Map
+	provFinder   provider.ProviderFinder
+	outputFinder output.OutputFinder
+	jobRunSaver  library.JobRunSaver
 }
 
 func NewFileLibraryRepository(
@@ -38,25 +39,23 @@ func NewFileLibraryRepository(
 	configPaths []string,
 	provFinder provider.ProviderFinder,
 	jobRunSaver library.JobRunSaver,
+	outputFinder output.OutputFinder,
 ) (Repository[*library.Library, string], error) {
 	r := &FileLibraryRepository{
-		subdir:      subdir,
-		configPaths: configPaths,
-		libraries:   sync.Map{},
-		paths:       sync.Map{},
-		idToPath:    sync.Map{},
-		provFinder:  provFinder,
-		jobRunSaver: jobRunSaver,
+		subdir:       subdir,
+		configPaths:  configPaths,
+		libraries:    sync.Map{},
+		paths:        sync.Map{},
+		idToPath:     sync.Map{},
+		provFinder:   provFinder,
+		outputFinder: outputFinder,
+		jobRunSaver:  jobRunSaver,
 	}
 
 	err := r.loadAll()
 	r.watch(ctx)
 
 	return r, err
-}
-
-func (r *FileLibraryRepository) filename(id string) string {
-	return filepath.Join(r.subdir, fmt.Sprintf("%s.json", id))
 }
 
 func (r *FileLibraryRepository) loadAll() error {
@@ -95,7 +94,12 @@ func (r *FileLibraryRepository) load(path string) {
 		return
 	}
 
-	lib, err := newLibraryFromPath(path, r.provFinder, r.jobRunSaver)
+	lib, err := newLibraryFromPath(
+		path,
+		r.provFinder,
+		r.jobRunSaver,
+		r.outputFinder,
+	)
 	if err != nil {
 		slog.Warn(
 			"skipping library",
@@ -115,6 +119,7 @@ func newLibraryFromPath(
 	path string,
 	provFinder provider.ProviderFinder,
 	jobRunSaver library.JobRunSaver,
+	outputFinder output.OutputFinder,
 ) (lib *library.Library, ferr error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -130,7 +135,7 @@ func newLibraryFromPath(
 	}()
 
 	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	l, err := library.NewLibrary(id, file, provFinder, jobRunSaver)
+	l, err := library.NewLibrary(id, file, provFinder, jobRunSaver, outputFinder)
 	if err != nil {
 		return nil, yerr.WithStackf("unmarshaling library %q: %w", path, err)
 	}

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/vyxn/yuzu/internal/library"
+	"github.com/vyxn/yuzu/internal/output"
 	"github.com/vyxn/yuzu/internal/provider"
 	"github.com/vyxn/yuzu/internal/repository"
 
@@ -19,8 +20,9 @@ func registerLibrary(
 	r repository.Repository[*library.Library, string],
 	pr repository.Repository[provider.Provider, string],
 	jrr repository.Repository[*library.JobRun, uuid.UUID],
+	or repository.Repository[output.Output, string],
 ) {
-	h := NewLibraryHandler(r, pr, jrr)
+	h := NewLibraryHandler(r, pr, jrr, or)
 
 	// e.GET("/lib", lib)
 	e.GET("/libraries", h.getLibraries)
@@ -37,14 +39,16 @@ type LibraryHandler struct {
 	r   repository.Repository[*library.Library, string]
 	pr  repository.Repository[provider.Provider, string]
 	jrr repository.Repository[*library.JobRun, uuid.UUID]
+	or  repository.Repository[output.Output, string]
 }
 
 func NewLibraryHandler(
 	r repository.Repository[*library.Library, string],
 	pr repository.Repository[provider.Provider, string],
 	jrr repository.Repository[*library.JobRun, uuid.UUID],
+	or repository.Repository[output.Output, string],
 ) *LibraryHandler {
-	return &LibraryHandler{r: r, pr: pr, jrr: jrr}
+	return &LibraryHandler{r: r, pr: pr, jrr: jrr, or: or}
 }
 
 func (h *LibraryHandler) getLibraries(c echo.Context) error {
@@ -70,7 +74,7 @@ func (h *LibraryHandler) getLibrary(c echo.Context) error {
 func (h *LibraryHandler) putLibrary(c echo.Context) error {
 	id := c.Param("id")
 
-	lib, err := library.NewLibrary(id, c.Request().Body, h.pr, h.jrr)
+	lib, err := library.NewLibrary(id, c.Request().Body, h.pr, h.jrr, h.or)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "parsing library").
 			SetInternal(err)

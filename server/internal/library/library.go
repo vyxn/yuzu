@@ -3,11 +3,13 @@ package library
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
 	"path/filepath"
 
+	"github.com/vyxn/yuzu/internal/output"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
 	"github.com/vyxn/yuzu/internal/provider"
 
@@ -27,6 +29,7 @@ type Library struct {
 	Selectors      Selectors               `json:"selectors"`
 	Jobs           []*Job                  `json:"jobs"`
 	providerFinder provider.ProviderFinder `json:"-"`
+	outputFinder   output.OutputFinder     `json:"-"`
 	jobRunSaver    JobRunSaver             `json:"-"`
 }
 
@@ -35,6 +38,7 @@ func NewLibrary(
 	r io.Reader,
 	provFinder provider.ProviderFinder,
 	jobRunSaver JobRunSaver,
+	outputFinder output.OutputFinder,
 ) (*Library, error) {
 	var l Library
 	d := json.NewDecoder(r)
@@ -43,10 +47,18 @@ func NewLibrary(
 	}
 	l.Id = id
 	l.providerFinder = provFinder
+	l.outputFinder = outputFinder
 	l.jobRunSaver = jobRunSaver
 
 	for _, j := range l.Jobs {
 		j.library = &l
+
+		j.Output.library = &l
+		out, err := j.Output.Resolve()
+		if err != nil {
+			return nil, fmt.Errorf("loading output %q: %w", j.Output.ID, err)
+		}
+		j.output = out
 	}
 
 	return &l, nil
