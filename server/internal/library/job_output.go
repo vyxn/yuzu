@@ -3,10 +3,13 @@ package library
 import (
 	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
 	"os"
 
 	"github.com/vyxn/yuzu/internal/output"
 	"github.com/vyxn/yuzu/internal/pkg/yerr"
+	"github.com/vyxn/yuzu/internal/pkg/zip"
 	"github.com/vyxn/yuzu/internal/provider"
 )
 
@@ -48,9 +51,10 @@ func (jo *RawJobOutput) Resolve() (JobOutput, error) {
 }
 
 type JobFileOutput struct {
-	ID   string        `json:"id"`
-	Path string        `json:"path"`
-	out  output.Output `json:"-"`
+	ID      string        `json:"id"`
+	Path    string        `json:"path"`
+	ZipPath string        `json:"zipPath"`
+	out     output.Output `json:"-"`
 }
 
 func newJobFileOutput(data []byte, out output.Output) (*JobFileOutput, error) {
@@ -64,8 +68,15 @@ func newJobFileOutput(data []byte, out output.Output) (*JobFileOutput, error) {
 
 func (o *JobFileOutput) Run(runEnv *provider.RunEnv, data any) (ferr error) {
 	path := runEnv.Replace(o.Path)
-	// slog.Info("job output", slog.String("path", path))
+	if o.ZipPath != "" {
+		zipPath := runEnv.Replace(o.ZipPath)
+		return o.writeInsideZip(zipPath, path, data)
+	} else {
+		return o.onlyFileWrite(path, data)
+	}
+}
 
+func (o *JobFileOutput) onlyFileWrite(path string, data any) (ferr error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -78,4 +89,27 @@ func (o *JobFileOutput) Run(runEnv *provider.RunEnv, data any) (ferr error) {
 	}()
 
 	return o.out.Run(data, f)
+}
+
+func (o *JobFileOutput) writeInsideZip(
+	zipPath string,
+	pathInZip string,
+	data any,
+) (ferr error) {
+	pr, pw := io.Pipe()
+	go func() {
+		defer func() {
+			if err := pw.Close(); err != nil {
+				ferr = errors.Join(ferr, err)
+				return
+			}
+		}()
+
+		err := o.out.Run(data, pw)
+		if err != nil {
+			slog.Error("writing in zip", slog.Any("error", err))
+		}
+	}()
+
+	return zip.WriteInZip(zipPath, pathInZip, pr)
 }

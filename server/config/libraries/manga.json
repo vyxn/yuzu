@@ -13,6 +13,7 @@
       "type": "file",
       "regex": "(?i)^.*?(?:chapter|ch|c)?\\s?(\\d+).*\\.cbz$",
       "captures": {
+        "%filePath%": 0,
         "%chapter%": 1
       }
     }
@@ -22,7 +23,8 @@
       "schedule": "* 0 * * *",
       "output": {
         "id": "comicinfo",
-        "path": "%dir%/%chapter%.ComicInfo.xml"
+        "path": "ComicInfo.xml",
+        "zipPath": "%dir%/%filePath%"
       },
       "providers": [
         {

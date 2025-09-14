@@ -43,8 +43,8 @@
 ### Job
 - [x] make base flow of a job run
 - [x] optimize number of provider runs with gorutines
-- [ ] job output: to disk file
-- [ ] job output: cbz inclusion
+- [x] job output: to disk file
+- [x] job output: cbz inclusion aka write inside zip
 - [ ] job output: merge multiple provider results
 - [x] job run repository 
 - [x] job run endpoints
