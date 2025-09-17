@@ -15,6 +15,10 @@
       "captures": {
         "%filePath%": 0,
         "%chapter%": 1
+      },
+      "skip": {
+        "regex": "ComicInfo.xml",
+        "inZip": true
       }
     }
   ],

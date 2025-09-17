@@ -6,6 +6,8 @@ import (
 	"maps"
 	"path/filepath"
 	"regexp"
+
+	"github.com/vyxn/yuzu/internal/pkg/zip"
 )
 
 type Selectors []*Selector
@@ -14,7 +16,14 @@ type Selector struct {
 	Type     string         `json:"type"`
 	Regex    string         `json:"regex"`
 	Captures map[string]int `json:"captures"`
+	Skip     *SelectorSkip  `json:"skip,omitempty"`
 	r        *regexp.Regexp `json:"-"`
+}
+
+type SelectorSkip struct {
+	Regex string         `json:"regex"`
+	InZip bool           `json:"inZip"`
+	r     *regexp.Regexp `json:"-"`
 }
 
 func (s *Selector) UnmarshalJSON(data []byte) error {
@@ -46,6 +55,14 @@ func (s *Selector) UnmarshalJSON(data []byte) error {
 					limit,
 				)
 			}
+		}
+
+		if s.Skip != nil && s.Skip.Regex != "" {
+			re, err := regexp.Compile(s.Skip.Regex)
+			if err != nil {
+				return fmt.Errorf("invalid regex %q: %w", s.Skip.Regex, err)
+			}
+			s.Skip.r = re
 		}
 	}
 
@@ -115,5 +132,13 @@ func (s *Selector) run(isDir bool, path string) map[string]string {
 	for k, i := range s.Captures {
 		env[k] = matches[i]
 	}
+
+	if s.Skip != nil && s.Skip.InZip && s.Skip.r != nil {
+		skip, err := zip.MatchInZip(path, s.Skip.r)
+		if err != nil || skip {
+			return nil
+		}
+	}
+
 	return env
 }

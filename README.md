@@ -46,11 +46,13 @@
 - [x] job output: to disk file
 - [x] job output: cbz inclusion aka write inside zip
 - [ ] job output: merge multiple provider results
-- [x] job run repository 
+- [x] job run repository
 - [x] job run endpoints
 - [ ] store job runs in SQLite
 - [ ] subJobs for each selected?
   - [ ] mark as pending/retry needed?
+- [x] allow to skip some selections based on a pattern over zip files
+- [ ] allow to skip some selections based on a pattern over files in same dir
 
 ### Additional Providers
 - [ ] books: goodreads

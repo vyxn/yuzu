@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 )
 
 func WriteInZip(
@@ -99,4 +100,19 @@ func copyZipFile(
 	}
 
 	return nil
+}
+
+func MatchInZip(zipPath string, re *regexp.Regexp) (bool, error) {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return false, err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		if re.MatchString(f.Name) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
